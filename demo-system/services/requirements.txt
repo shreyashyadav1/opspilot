@@ -1,0 +1,11 @@
+# Runtime dependencies of the Python demo services (storefront, payments, control-plane, loadgen).
+fastapi==0.141.1
+uvicorn[standard]==0.53.0
+httpx==0.28.1
+pydantic==2.13.5
+prometheus-client==0.26.0
+opentelemetry-api==1.44.0
+opentelemetry-sdk==1.44.0
+opentelemetry-instrumentation-fastapi==0.65b0
+opentelemetry-instrumentation-httpx==0.65b0
+opentelemetry-exporter-otlp-proto-http==1.44.0
