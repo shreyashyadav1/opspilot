@@ -1,0 +1,114 @@
+# OpsPilot demo system: storefront -> orders -> (postgres, payments), plus the control plane
+# (deploys + chaos API), Prometheus and a load generator.
+#
+# Host ports: 8101 storefront, 8102 orders, 8103 payments, 8190 control-plane,
+#             9095 prometheus, 5440 postgres.
+name: opspilot
+
+x-python-service: &python-service
+  image: opspilot-python-services:dev
+  build:
+    context: ./services
+  restart: unless-stopped
+  mem_limit: 160m
+  healthcheck:
+    test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health', timeout=2)"]
+    interval: 10s
+    timeout: 3s
+    retries: 3
+    start_period: 10s
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: opspilot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: orders
+      POSTGRES_USER: orders
+      POSTGRES_PASSWORD: ${ORDERS_DB_PASSWORD:-orders-local-dev}
+    command: ["postgres", "-c", "shared_buffers=32MB", "-c", "max_connections=40"]
+    ports:
+      - "5440:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    mem_limit: 192m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orders -d orders"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  orders:
+    image: opspilot-orders:dev
+    build:
+      context: ./orders
+    container_name: opspilot-orders
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/orders
+      DB_USER: orders
+      DB_PASSWORD: ${ORDERS_DB_PASSWORD:-orders-local-dev}
+      PAYMENTS_URL: http://payments:8080
+    ports:
+      - "8102:8080"
+    mem_limit: 448m
+
+  payments:
+    <<: *python-service
+    container_name: opspilot-payments
+    command: ["uvicorn", "opsdemo.payments.app:app", "--host", "0.0.0.0", "--port", "8080", "--no-access-log", "--timeout-graceful-shutdown", "5"]
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    ports:
+      - "8103:8080"
+
+  storefront:
+    <<: *python-service
+    container_name: opspilot-storefront
+    command: ["uvicorn", "opsdemo.storefront.app:app", "--host", "0.0.0.0", "--port", "8080", "--no-access-log", "--timeout-graceful-shutdown", "5"]
+    environment:
+      ORDERS_URL: http://orders:8080
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    ports:
+      - "8101:8080"
+
+  control-plane:
+    <<: *python-service
+    container_name: opspilot-control-plane
+    command: ["uvicorn", "opsdemo.control_plane.app:app", "--host", "0.0.0.0", "--port", "8080", "--no-access-log", "--timeout-graceful-shutdown", "5"]
+    environment:
+      CP_SERVICE_URLS: storefront=http://storefront:8080,orders=http://orders:8080,payments=http://payments:8080
+    ports:
+      - "8190:8080"
+
+  loadgen:
+    <<: *python-service
+    container_name: opspilot-loadgen
+    command: ["python", "-m", "opsdemo.loadgen.main"]
+    environment:
+      TARGET_URL: http://storefront:8080
+      RPS: "4"
+    healthcheck:
+      disable: true
+    depends_on:
+      - storefront
+
+  prometheus:
+    image: prom/prometheus:v3.13.3
+    container_name: opspilot-prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=6h
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9095:9090"
+    mem_limit: 256m
+
+volumes:
+  postgres-data:
