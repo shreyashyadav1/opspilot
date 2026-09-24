@@ -1,0 +1,1 @@
+"""OpsPilot observability MCP server."""
