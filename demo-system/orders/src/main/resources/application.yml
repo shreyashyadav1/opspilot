@@ -1,0 +1,68 @@
+server:
+  port: 8080
+  shutdown: graceful
+  tomcat:
+    threads:
+      max: 50
+
+spring:
+  application:
+    name: orders
+  main:
+    banner-mode: off
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://postgres:5432/orders}
+    username: ${DB_USER:orders}
+    password: ${DB_PASSWORD:orders}
+    hikari:
+      pool-name: orders-db
+      maximum-pool-size: 5
+      minimum-idle: 2
+      connection-timeout: 1500
+      leak-detection-threshold: 10000
+      max-lifetime: 600000
+  sql:
+    init:
+      mode: always
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    default-property-inclusion: non_null
+
+logging:
+  structured:
+    format:
+      console: logstash
+    json:
+      add:
+        service: orders
+  level:
+    root: INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      show-details: always
+  health:
+    diskspace:
+      enabled: false
+    ssl:
+      enabled: false
+  metrics:
+    distribution:
+      # Same buckets as the Python services (opsdemo/common/metrics.py).
+      slo:
+        http.server.requests: 5ms,10ms,25ms,50ms,75ms,100ms,150ms,250ms,400ms,600ms,800ms,1s,1250ms,1500ms,2s,2500ms,3s,5s,10s
+        http.client.requests: 5ms,10ms,25ms,50ms,75ms,100ms,150ms,250ms,400ms,600ms,800ms,1s,1250ms,1500ms,2s,2500ms,3s,5s,10s
+  tracing:
+    sampling:
+      probability: 1.0
+
+orders:
+  version: ${SERVICE_VERSION:1.8.3}
+  payments:
+    base-url: ${PAYMENTS_URL:http://payments:8080}
+    timeout-ms: 2000
