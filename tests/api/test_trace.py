@@ -28,15 +28,17 @@ from opspilot_api.trace import events_from_update, parse_output, summarize
         (
             "query_metric",
             {
+                "service": "payments",
                 "metric": "error_rate",
                 "unit": "ratio",
                 "series": [{"latest": 0.412, "baseline": 0.002, "trend": "rising"}],
             },
-            "error_rate: 41.2% vs baseline 0.2%, rising.",
+            "payments error_rate: 41.2% vs baseline 0.2%, rising.",
         ),
         (
             "query_metric",
             {
+                "service": "orders",
                 "metric": "latency_p95",
                 "unit": "ms",
                 "series": [
@@ -49,7 +51,8 @@ from opspilot_api.trace import events_from_update, parse_output, summarize
                     {"labels": {"peer": "postgres"}, "latest": 3.0, "baseline": 3.0},
                 ],
             },
-            "latency_p95 (peer=payments): 1310.5 ms vs baseline 22 ms, rising (+1 more series).",
+            "orders latency_p95 (peer=payments): 1310.5 ms vs baseline 22 ms, rising "
+            "(+1 more series).",
         ),
         (
             "query_metric",

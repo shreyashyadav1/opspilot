@@ -86,10 +86,10 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        store = await InvestigationStore.open(settings.database)
+        store = await InvestigationStore.open(settings.records_db)
         chaos = ChaosClient(settings.chaos_url, chaos_transport) if settings.chaos_url else None
         try:
-            async with AsyncSqliteSaver.from_conn_string(str(settings.database)) as saver:
+            async with AsyncSqliteSaver.from_conn_string(str(settings.checkpoints_db)) as saver:
                 service = InvestigationService(
                     store,
                     saver,

@@ -290,3 +290,13 @@ async def test_sse_streams_snapshots_until_the_investigation_ends(settings, tool
 
         missing = await client.get("/investigations/inv-9999/events")
         assert missing.status_code == 404
+
+
+async def test_concurrent_investigations_are_all_recorded(settings, tools):
+    async with serve(build_app(settings, tools, "escalate")) as client:
+        ids = [await start(client) for _ in range(6)]
+        done = await asyncio.gather(*(wait_for(client, i, TERMINAL) for i in ids))
+        listed = (await client.get("/investigations")).json()["investigations"]
+    assert {d["status"] for d in done} == {"advisory"}
+    assert [i["id"] for i in listed] == list(reversed(ids))
+    assert all(len(d["trace"]) == 6 for d in done)

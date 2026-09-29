@@ -1,8 +1,8 @@
 """API settings, read from the environment (and `.env`).
 
 - OPSPILOT_MODEL: model for new investigations (`provider:model`); see `default_model()`.
-- OPSPILOT_API_DB: SQLite file for investigation records and graph checkpoints
-  (default `.opspilot/api.db`).
+- OPSPILOT_API_DATA_DIR: where the API keeps its SQLite files (default `.opspilot`):
+  `investigations.sqlite` (records and trace events) and `checkpoints.sqlite` (LangGraph).
 - OPSPILOT_BACKEND: telemetry backend of the MCP tool server, `live` (default) or `simulated`;
   OPSPILOT_SIMULATION optionally points at a SimulationSpec JSON for the latter.
 - OPSPILOT_CHAOS_URL: control plane base URL. Enables the demo fault-injection endpoints.
@@ -37,7 +37,7 @@ def default_model() -> str:
 
 @dataclass(frozen=True)
 class ApiSettings:
-    database: Path = Path(".opspilot/api.db")
+    data_dir: Path = Path(".opspilot")
     model: str = BASELINE_MODEL
     backend: str = "live"
     simulation: Path | None = None
@@ -45,6 +45,15 @@ class ApiSettings:
     results_dir: Path = field(default_factory=lambda: REPO_ROOT / "evals" / "results")
     max_concurrent: int = 2
     max_turns: int = 12
+
+    @property
+    def records_db(self) -> Path:
+        return self.data_dir / "investigations.sqlite"
+
+    @property
+    def checkpoints_db(self) -> Path:
+        # A separate file: each SQLite file then has a single writing connection.
+        return self.data_dir / "checkpoints.sqlite"
 
     @property
     def models(self) -> list[str]:
@@ -58,7 +67,7 @@ class ApiSettings:
         simulation = os.getenv("OPSPILOT_SIMULATION")
         results = os.getenv("OPSPILOT_RESULTS_DIR")
         return cls(
-            database=Path(os.getenv("OPSPILOT_API_DB", str(defaults.database))),
+            data_dir=Path(os.getenv("OPSPILOT_API_DATA_DIR", str(defaults.data_dir))),
             model=default_model(),
             backend=os.getenv("OPSPILOT_BACKEND", defaults.backend),
             simulation=Path(simulation) if simulation else None,

@@ -60,7 +60,7 @@ def _metric(payload: dict[str, Any]) -> str:
     scope = f" ({', '.join(f'{k}={v}' for k, v in labels.items())})" if labels else ""
     more = f" (+{len(series) - 1} more series)" if len(series) > 1 else ""
     return (
-        f"{payload.get('metric')}{scope}: {_num(s.get('latest'), unit)} "
+        f"{payload.get('service')} {payload.get('metric')}{scope}: {_num(s.get('latest'), unit)} "
         f"vs baseline {_num(s.get('baseline'), unit)}, {s.get('trend')}{more}."
     )
 

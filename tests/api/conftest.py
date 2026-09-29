@@ -1,4 +1,4 @@
-"""Fixtures for the agent API: settings on a temporary database, in-process fake tools."""
+"""Fixtures for the agent API: settings on a temporary data directory, in-process fake tools."""
 
 import pytest
 
@@ -14,7 +14,7 @@ def tools() -> FakeTools:
 @pytest.fixture
 def settings(tmp_path) -> ApiSettings:
     return ApiSettings(
-        database=tmp_path / "state" / "api.db",
+        data_dir=tmp_path / "state",
         model="fake:playbook",
         results_dir=tmp_path / "results",
     )
