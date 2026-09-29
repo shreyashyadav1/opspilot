@@ -86,7 +86,7 @@ from opspilot_api.trace import events_from_update, parse_output, summarize
                     }
                 ],
             },
-            "1 events. Latest: orders deploy 1.8.4 by s.patel (payments.base-url).",
+            "1 event. Latest: orders deploy 1.8.4 by s.patel (payments.base-url).",
         ),
         (
             "get_recent_deploys",

@@ -84,8 +84,9 @@ def _deploys(payload: dict[str, Any]) -> str:
         return f"No deploys in the last {payload.get('since_minutes')} minutes."
     latest = events[0]
     changed = ", ".join(latest.get("config_diff") or {}) or "no config change"
+    count = f"{len(events)} event{'' if len(events) == 1 else 's'}"
     return (
-        f"{len(events)} events. Latest: {latest.get('service')} {latest.get('kind')} "
+        f"{count}. Latest: {latest.get('service')} {latest.get('kind')} "
         f"{latest.get('version')} by {latest.get('author')} ({changed})."
     )
 
