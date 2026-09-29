@@ -16,10 +16,25 @@ from typing import Any
 from opspilot_mcp.models import LEVEL_ORDER, LogEntry
 
 _KNOWN = {
-    "timestamp", "@timestamp", "@version", "level", "level_value", "message", "logger",
-    "logger_name", "thread_name", "service", "trace_id", "traceId", "span_id", "spanId",
-    "error_type", "error_message", "stack_trace", "version",
-}  # fmt: skip
+    "timestamp",
+    "@timestamp",
+    "@version",
+    "level",
+    "level_value",
+    "message",
+    "logger",
+    "logger_name",
+    "thread_name",
+    "service",
+    "trace_id",
+    "traceId",
+    "span_id",
+    "spanId",
+    "error_type",
+    "error_message",
+    "stack_trace",
+    "version",
+}
 _FRACTION = re.compile(r"(\.\d{6})\d+")
 _PATTERNS = (
     (re.compile(r"\b[0-9a-f]{12,}\b"), "<id>"),
