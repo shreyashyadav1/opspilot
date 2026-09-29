@@ -1,3 +1,5 @@
+import { Fragment } from "react";
+
 import { formatArg } from "@/lib/format";
 
 import styles from "./Signature.module.css";
@@ -9,10 +11,13 @@ export function Signature({ tool, args }: { tool: string; args: Record<string, u
     <code className={styles.signature}>
       {tool}(
       {entries.map(([key, value], index) => (
-        <span key={key} className={styles.arg}>
-          {key}={formatArg(value)}
-          {index < entries.length - 1 ? ", " : ""}
-        </span>
+        <Fragment key={key}>
+          <span className={styles.arg}>
+            {key}={formatArg(value)}
+            {index < entries.length - 1 ? "," : ""}
+          </span>
+          {index < entries.length - 1 ? " " : ""}
+        </Fragment>
       ))}
       )
     </code>
