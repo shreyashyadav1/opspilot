@@ -251,20 +251,27 @@ fakes implement the same LangChain chat-model interface:
 Scenarios are YAML files:
 
 ```yaml
-id: payments-latency-spike
-alert: {service: storefront, summary: "Checkout p95 latency above SLO"}
-fault: {type: latency_spike, target: payments, params: {delay_ms: 1200}}
-distractors: [{type: benign_deploy, service: storefront, minutes_ago: 4}]
+id: payments-error-spike
+title: Payments throws on a share of charges, right after a storefront deploy
+alert:
+  title: Checkout error rate above SLO
+  service: storefront
+  details: POST /checkout 5xx rate is above the 2% SLO.
+fault: {type: error_spike, target: payments, params: {error_rate: 0.4}}
+distractors: [{type: benign_deploy, service: storefront, minutes_ago: 7}]
 expected:
   root_cause_service: payments
-  category: latency
+  category: error_rate
   action: {type: escalate, target_service: payments}
 relevant_services: [payments, orders, storefront]
-required_evidence: [{tool: query_metric, service: payments}]
+required_evidence:
+  - {tool: query_metric, service: payments}
+  - {tool: search_logs, service: payments}
 ```
 
-Runner flow per scenario: reset the environment, apply distractors, inject the fault, wait for
-the symptoms to show up in telemetry, run the agent against the alert, answer the approval
+Runner flow per scenario: reset the environment, let healthy traffic run for a cool-down
+period, apply distractors, inject the fault, wait for the symptoms to show up in telemetry, run
+the agent against the alert (which states how long it has been firing), answer the approval
 request with the configured policy, score, reset. Two environments share this flow:
 
 - `simulated`: the MCP server runs with the simulated backend for the scenario. Used in CI
@@ -333,6 +340,11 @@ Rules and caveats:
 - Scenarios contain a single fault each. Some include distractors, such as a harmless deploy of
   an unrelated service just before the fault, to test that the agent does not blame the most
   recent change by reflex.
+- Live scenarios run back to back, so earlier incidents stay visible in the metric window. The
+  runner waits two minutes of healthy traffic after each reset, scenario order interleaves
+  target services, and the metric baseline is the median of the first half of the window.
+  Some history remains visible, as it would on a real on-call shift. Start the stack about ten
+  minutes before a run so the first scenarios also have a baseline.
 
 ## 6. Security and safety
 
@@ -347,24 +359,24 @@ Rules and caveats:
 
 ## 7. Milestones
 
-- [ ] **M1: Design and scaffolding**
-  - [ ] Design document
-  - [ ] Python project (pinned dependencies, ruff, pytest), Makefile
-  - [ ] CI workflow: lint, unit tests, deterministic benchmark
-- [ ] **M2: Demo system**
-  - [ ] storefront and payments (FastAPI) with JSON logs, Prometheus metrics, trace propagation
-  - [ ] orders (Spring Boot 3, Java 21) with Postgres, HikariCP and actuator metrics
-  - [ ] Control plane: deploy registry and chaos API with ground-truth records
-  - [ ] Five fault types, docker compose stack with Prometheus and a load generator
-- [ ] **M3: MCP server and agent**
-  - [ ] MCP server with four read tools and the `rollback_deploy` write tool
-  - [ ] Live and simulated telemetry backends
-  - [ ] LangGraph agent with validated diagnosis and interrupt-based approval gate
-  - [ ] CLI for interactive investigations
+- [x] **M1: Design and scaffolding**
+  - [x] Design document
+  - [x] Python project (pinned dependencies, ruff, pytest), Makefile
+  - [x] CI workflow: lint, unit tests, deterministic benchmark, image builds
+- [x] **M2: Demo system**
+  - [x] storefront and payments (FastAPI) with JSON logs, Prometheus metrics, trace propagation
+  - [x] orders (Spring Boot 3, Java 21) with Postgres, HikariCP and actuator metrics
+  - [x] Control plane: deploy registry and chaos API with ground-truth records
+  - [x] Five fault types, docker compose stack with Prometheus and a load generator
+- [x] **M3: MCP server and agent**
+  - [x] MCP server with four read tools and the `rollback_deploy` write tool
+  - [x] Live and simulated telemetry backends
+  - [x] LangGraph agent with validated diagnosis and interrupt-based approval gate
+  - [x] CLI for interactive investigations
 - [ ] **M4: Benchmark**
-  - [ ] Scenario format and at least eight scenarios
-  - [ ] Runner, scorer, JSON and Markdown reports
-  - [ ] Deterministic CI run with the playbook model
+  - [x] Scenario format and at least eight scenarios (11 today)
+  - [x] Runner, scorer, JSON and Markdown reports
+  - [x] Deterministic CI run with the playbook model
   - [ ] First real benchmark run against a hosted model, published with model, date and commit
 - [ ] **M5: Operator dashboard** (Next.js + TypeScript)
   - [ ] Incident list and detail view with the agent's reasoning trace and tool calls
@@ -373,7 +385,9 @@ Rules and caveats:
 - [ ] **M6: Agent observability**
   - [ ] Trace every agent run (Langfuse or OpenTelemetry GenAI conventions): model calls,
         tool calls, latency and tokens per step
-  - [ ] Export demo-system traces to a trace backend and add a `get_trace` tool
+  - [ ] Export demo-system traces to a trace backend (the Python services already export over
+        OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; orders needs an exporter) and add a
+        `get_trace` tool
 - [ ] **M7: Kubernetes and cloud**
   - [ ] kind cluster with Helm charts for the demo system, the MCP server and the agent API
   - [ ] Loki log backend for the MCP server
