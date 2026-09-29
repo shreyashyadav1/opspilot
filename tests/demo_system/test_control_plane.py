@@ -193,3 +193,21 @@ def test_api_hides_config_snapshots_and_validates_requests(monkeypatch, admin):
         assert created.json()["ground_truth"] == {"service": "orders", "category": "error_rate"}
         active = client.get("/chaos/faults", params={"active_only": True}).json()["faults"]
         assert [f["id"] for f in active] == [created.json()["id"]]
+
+
+def test_catalog_lists_every_fault_type_with_targets_and_param_bounds(monkeypatch):
+    monkeypatch.setenv("CP_RESET_ON_STARTUP", "false")
+    from opsdemo.control_plane.app import app
+
+    with TestClient(app) as client:
+        response = client.get("/chaos/catalog")
+    assert response.status_code == 200
+    catalog = {entry["type"]: entry for entry in response.json()["fault_types"]}
+    assert set(catalog) == {t.value for t in FaultType}
+    assert catalog["db_pool_exhaustion"]["targets"] == ["orders"]
+    assert catalog["dependency_outage"]["targets"] == ["orders", "payments"]
+    assert catalog["bad_config_deploy"]["category"] == "bad_deploy"
+    assert catalog["bad_config_deploy"]["params"] == {}
+    delay = catalog["latency_spike"]["params"]["delay_ms"]
+    assert (delay["minimum"], delay["maximum"], delay["default"]) == (50, 10_000, 1200)
+    assert all(entry["description"].endswith(".") for entry in catalog.values())

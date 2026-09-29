@@ -75,6 +75,44 @@ PARAMS: dict[FaultType, type[BaseModel]] = {
 }
 
 
+DESCRIPTIONS: dict[FaultType, str] = {
+    FaultType.LATENCY_SPIKE: "Adds a delay to the target's business requests.",
+    FaultType.ERROR_SPIKE: "A share of the target's requests fail with a realistic exception.",
+    FaultType.DB_POOL_EXHAUSTION: (
+        "A background export job leaks database connections until the pool is empty."
+    ),
+    FaultType.BAD_CONFIG_DEPLOY: (
+        "Records a deploy that ships a broken config change, then applies it."
+    ),
+    FaultType.DEPENDENCY_OUTAGE: (
+        "The target stops serving: 503 on every endpoint, failing health checks and scrapes."
+    ),
+}
+
+
+class FaultTypeInfo(BaseModel):
+    """One entry of the fault catalog: what can be injected where, and with which params."""
+
+    type: FaultType
+    category: str
+    description: str
+    targets: list[str]
+    params: dict[str, dict[str, Any]]
+
+
+def fault_catalog() -> list[FaultTypeInfo]:
+    return [
+        FaultTypeInfo(
+            type=fault_type,
+            category=CATEGORY[fault_type],
+            description=DESCRIPTIONS[fault_type],
+            targets=sorted(ALLOWED_TARGETS[fault_type]),
+            params=PARAMS[fault_type].model_json_schema().get("properties", {}),
+        )
+        for fault_type in FaultType
+    ]
+
+
 def failure_fields(fault_type: FaultType, params: BaseModel) -> dict[str, Any]:
     """Admin-API failure-mode fields that implement a fault (not used for bad deploys)."""
     match fault_type:
