@@ -1,8 +1,11 @@
 # OpsPilot demo system: storefront -> orders -> (postgres, payments), plus the control plane
 # (deploys + chaos API), Prometheus and a load generator.
 #
+# The "dashboard" profile adds the agent API and the operator dashboard:
+#   docker compose -f demo-system/docker-compose.yml --profile dashboard up -d --build
+#
 # Host ports: 8101 storefront, 8102 orders, 8103 payments, 8190 control-plane,
-#             9095 prometheus, 5440 postgres.
+#             9095 prometheus, 5440 postgres; dashboard profile: 8100 dashboard, 8180 agent API.
 name: opspilot
 
 x-python-service: &python-service
@@ -110,5 +113,71 @@ services:
       - "9095:9090"
     mem_limit: 256m
 
+  # -- dashboard profile ----------------------------------------------------------------------
+
+  agent-api:
+    profiles: [dashboard]
+    image: opspilot-agent-api:dev
+    build:
+      context: ..
+      dockerfile: api/Dockerfile
+    container_name: opspilot-agent-api
+    restart: unless-stopped
+    depends_on:
+      control-plane:
+        condition: service_healthy
+      prometheus:
+        condition: service_started
+    # Model keys (GROQ_API_KEY, OPSPILOT_MODEL, ...) come from the repository's .env, if any.
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      OPSPILOT_CHAOS_URL: http://control-plane:8080
+      OPSPILOT_PROMETHEUS_URL: http://prometheus:9090
+      OPSPILOT_CONTROL_PLANE_URL: http://control-plane:8080
+      OPSPILOT_SERVICE_URLS: storefront=http://storefront:8080,orders=http://orders:8080,payments=http://payments:8080
+    volumes:
+      - agent-api-data:/data
+      - ../evals/results:/app/evals/results:ro
+      # The MCP server reads container logs with `docker logs`. The socket gives this container
+      # control of the Docker daemon, so keep the stack local. On Linux, set DOCKER_SOCKET_GID to
+      # the socket's group (stat -c %g /var/run/docker.sock); Docker Desktop uses 0.
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "${DOCKER_SOCKET_GID:-0}"
+    ports:
+      - "8180:8080"
+    mem_limit: 384m
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+
+  dashboard:
+    profiles: [dashboard]
+    image: opspilot-dashboard:dev
+    build:
+      context: ../ui
+    container_name: opspilot-dashboard
+    restart: unless-stopped
+    depends_on:
+      agent-api:
+        condition: service_healthy
+    environment:
+      OPSPILOT_API_URL: http://agent-api:8080
+    ports:
+      - "8100:8080"
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
 volumes:
   postgres-data:
+  agent-api-data:
