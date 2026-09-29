@@ -68,11 +68,13 @@ class TelemetryMiddleware:
             await self.app(scope, receive, send)
             return
 
+        started = time.perf_counter()
         delay = self.runtime.added_latency_s()
         if delay:
+            # Counted in the request duration: to callers and metrics this is the service
+            # being slow.
             await asyncio.sleep(delay)
 
-        started = time.perf_counter()
         response_started = False
         status = 500
 
