@@ -1,6 +1,7 @@
 """Graph behaviour with a scripted model: investigation, validation, approval gate, budgets."""
 
 import json
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -185,3 +186,13 @@ async def test_unknown_tools_are_reported_to_the_model(recorder):
     model = ScriptedChatModel(responses=[call("restart_everything", {}, "c1"), submit(diagnosis())])
     result = await run(model, recorder)
     assert result.tool_calls[0]["error"] == "unknown_tool"
+
+
+async def test_tool_call_records_carry_call_id_and_start_time(recorder):
+    model = ScriptedChatModel(responses=[call("get_service_health", {}, "c1"), submit(diagnosis())])
+    result = await run(model, recorder)
+    [record] = result.tool_calls
+    assert record["call_id"] == "c1"
+    started = datetime.fromisoformat(record["started_at"])
+    assert started.tzinfo is not None
+    assert abs((datetime.now(UTC) - started).total_seconds()) < 60
