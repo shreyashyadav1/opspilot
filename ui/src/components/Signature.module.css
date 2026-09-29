@@ -1,0 +1,8 @@
+.signature {
+  overflow-wrap: anywhere;
+}
+
+.arg {
+  display: inline-block;
+  max-width: 100%;
+}

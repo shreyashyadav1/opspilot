@@ -14,6 +14,7 @@ import json
 import operator
 import time
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Annotated, Any, TypedDict
 
 from langchain_core.language_models import BaseChatModel
@@ -127,7 +128,13 @@ def build_graph(
 
     async def run_tool(call: dict[str, Any], turn: int) -> tuple[ToolMessage, dict[str, Any]]:
         name, args = call["name"], call.get("args") or {}
-        record: dict[str, Any] = {"turn": turn, "tool": name, "args": args}
+        record: dict[str, Any] = {
+            "turn": turn,
+            "tool": name,
+            "args": args,
+            "call_id": call["id"],
+            "started_at": datetime.now(UTC).isoformat(timespec="milliseconds"),
+        }
         started = time.perf_counter()
         if name in write_tools:
             text = (

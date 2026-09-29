@@ -1,0 +1,14 @@
+# Allow-list for the agent API image (build context: repository root). Keeps .env, virtualenvs,
+# node_modules and local results out of the image.
+*
+!pyproject.toml
+!requirements.lock
+!README.md
+!LICENSE
+!agent/
+!api/
+!mcp-servers/
+!evals/
+evals/results/
+**/__pycache__/
+**/*.pyc

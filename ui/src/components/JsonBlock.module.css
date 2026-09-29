@@ -1,0 +1,13 @@
+.block {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-3);
+  max-height: 320px;
+  overflow: auto;
+  background: var(--surface-sunk);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-panel);
+  font-size: var(--text-xs);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

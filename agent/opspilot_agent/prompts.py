@@ -59,9 +59,16 @@ def nudge() -> str:
 
 
 def alert_message(
-    title: str, service: str, details: str, started_minutes_ago: float | None = None
+    title: str,
+    service: str | None,
+    details: str | None = None,
+    started_minutes_ago: float | None = None,
 ) -> str:
-    lines = [f"ALERT: {title}", f"Service: {service}", f"Details: {details}"]
+    """The first user message of an investigation. `service` is where the alert fired, if known."""
+    lines = [f"ALERT: {title}"]
+    if service:
+        lines.append(f"Service: {service}")
+    lines.append(f"Details: {details or title}")
     if started_minutes_ago is not None:
         lines.append(f"Firing for about {max(1, round(started_minutes_ago))} minutes.")
     lines.append("Investigate the root cause and submit a diagnosis.")

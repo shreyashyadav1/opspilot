@@ -10,7 +10,9 @@ accuracy, tool-call precision, steps, time to diagnosis and token cost per incid
 The agent is a LangGraph state machine on top of any OpenAI-compatible model (Groq
 `llama-3.3-70b-versatile` by default). The system under investigation is a Docker Compose
 stack: FastAPI and Spring Boot services, Postgres, Prometheus, a load generator, and a control
-plane that injects faults and records their ground truth.
+plane that injects faults and records their ground truth. An operator dashboard (Next.js, on a
+FastAPI agent API) shows each investigation as it happens and is where a person approves or
+rejects the proposed action.
 
 ## Architecture
 
@@ -28,6 +30,8 @@ flowchart LR
     AG["LangGraph agent<br/>approval gate"]
     LLM["LLM<br/>(OpenAI-compatible)"]
     EV["benchmark runner"]
+    API["agent API<br/>FastAPI, SQLite checkpoints"]
+    UI["dashboard<br/>Next.js"]
     MCP --> PROM
     MCP --> CP
     MCP -->|logs, health| demo
@@ -35,7 +39,10 @@ flowchart LR
     AG <--> LLM
     EV -->|inject fault, ground truth| CP
     EV --> AG
-    Human((on-call)) -->|approve / reject| AG
+    API -->|runs, resumes| AG
+    API -. demo faults .-> CP
+    UI -->|/api, live events| API
+    Human((on-call)) -->|approve / reject| UI
 ```
 
 | Component | Path | Highlights |
@@ -44,6 +51,8 @@ flowchart LR
 | MCP server | [`mcp-servers/`](mcp-servers/opspilot_mcp) | Official Python `mcp` SDK. `get_service_health`, `query_metric`, `search_logs`, `get_recent_deploys` (read-only) and `rollback_deploy` (destructive). Live and simulated backends |
 | Agent | [`agent/`](agent/opspilot_agent) | LangGraph graph with a bounded investigation loop, a Pydantic-validated `Diagnosis`, and an `interrupt()`-based approval gate |
 | Benchmark | [`evals/`](evals) | 11 YAML scenarios, runner, scorer, JSON and Markdown reports |
+| Agent API | [`api/`](api/opspilot_api) | FastAPI. Runs investigations in the background, streams them over Server-Sent Events, keeps pending approvals in a LangGraph SQLite checkpoint across restarts |
+| Dashboard | [`ui/`](ui) | Next.js App Router and TypeScript. Incident list, investigation timeline with the approval gate, approve and reject, demo fault injection, benchmark browser |
 
 The full design, including the evaluation methodology, is in [docs/DESIGN.md](docs/DESIGN.md).
 
@@ -82,6 +91,39 @@ When the agent proposes a rollback, the CLI shows the action with its evidence a
 yes or no. Use `--approve no` to only diagnose. Any OpenAI-compatible model works through
 `--model provider:model` (`groq`, `openai`, `openrouter`, `ollama`, or `custom` with
 `OPSPILOT_LLM_BASE_URL`).
+
+## Dashboard
+
+The dashboard runs investigations and is where their proposed actions get approved or rejected.
+Everything in Docker (the stack, the agent API on :8180, the dashboard on :8100):
+
+```bash
+make dashboard-up      # about 1 GB of memory for the whole stack
+open http://localhost:8100
+```
+
+1. In **Demo: inject a fault**, pick *Bad config deploy* on *orders* and inject it. The control
+   plane records the ground truth; the agent never sees it.
+2. Wait about a minute for the symptoms to reach metrics and logs, then start an investigation
+   of *Checkout error rate above SLO* fired on storefront.
+3. Follow the timeline: every model turn, tool call (arguments, result summary, raw output) and
+   the diagnosis. The run stops at the approval gate with a proposed `rollback_deploy`.
+4. Approve the rollback. The demo panel then shows the fault as resolved by the rollback.
+   Rejecting instead ends the investigation without executing anything.
+
+Without an API key the agent API uses the rule-based playbook (`fake:playbook`), which the
+dashboard labels as a baseline, not an LLM. With `GROQ_API_KEY` in `.env`, it uses
+`llama-3.3-70b-versatile` and still offers the playbook for comparison. Investigations and
+pending approvals survive restarts of the API; `make down` removes them with the other volumes.
+
+For development, run the API and the dashboard on the host against `make up`:
+
+```bash
+make up
+make api-dev     # agent API on :8180, reloads on code changes
+make ui-dev      # dashboard on :8100, proxies /api to :8180
+make api-test ui-test ui-e2e   # pytest; lint, types, Vitest; Playwright smoke tests (Chrome)
+```
 
 ## How the benchmark works
 
@@ -136,6 +178,10 @@ the model, date, commit and number of repetitions.
 - The model is only ever given read-only tools and the `submit_diagnosis` schema. The write
   tool is reachable only through the graph's approval node, which pauses with `interrupt()`
   until a human (or an explicit eval policy) answers.
+- In the agent API, a rejection resumes the paused graph without any tools attached, and a
+  decision is accepted once: concurrent or repeated decisions are refused.
+- The agent API and dashboard have no authentication yet; run them locally. In Docker the API
+  mounts the Docker socket to read container logs, which is fine for a local demo only.
 - The model never writes PromQL, shell commands or URLs; every tool argument is an enum or a
   bounded value, and tool output is truncated before it reaches the model.
 - API keys come from `.env` and are not passed to the MCP server process.
@@ -146,7 +192,8 @@ the model, date, commit and number of repetitions.
 - [x] M2 Demo system with five fault types
 - [x] M3 MCP server and LangGraph agent with approval gate
 - [ ] M4 Benchmark: harness, scenarios and CI run are done; first real LLM run pending
-- [ ] M5 Operator dashboard (Next.js + TypeScript): incidents, reasoning trace, approve and reject
+- [x] M5 Operator dashboard (Next.js + TypeScript) on a FastAPI agent API: incidents, reasoning
+  trace, approve and reject, benchmark browser
 - [ ] M6 Agent observability: Langfuse or OpenTelemetry traces of every model and tool call
 - [ ] M7 Kubernetes (kind + Helm), Loki log backend, cloud deployment
 
@@ -156,6 +203,8 @@ See the milestone details in [docs/DESIGN.md](docs/DESIGN.md#7-milestones).
 
 ```text
 agent/opspilot_agent/      LangGraph graph, schemas, prompts, model factory and fakes, CLI
+api/opspilot_api/          agent API: investigations, decisions, live events, demo faults
+ui/                        dashboard (Next.js): pages, components, Vitest and Playwright tests
 mcp-servers/opspilot_mcp/  MCP server, metric catalog, log search, live and simulated backends
 evals/                     scenarios, pricing, runner, scorer, reports
 demo-system/               docker compose, Python services, Spring Boot orders, Prometheus

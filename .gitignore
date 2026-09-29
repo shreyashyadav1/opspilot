@@ -32,3 +32,6 @@ evals/results/*
 .vscode/
 *.swp
 .DS_Store
+
+# Agent API state (investigation records and graph checkpoints)
+.opspilot/

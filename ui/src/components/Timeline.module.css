@@ -1,0 +1,328 @@
+.section {
+  --when: 78px;
+  --marker: 22px;
+  --col-gap: var(--space-3);
+  --rail-x: calc(var(--when) + var(--col-gap) + var(--marker) / 2 - 1px);
+}
+
+.heading {
+  margin-bottom: var(--space-4);
+}
+
+.timeline {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.entry,
+.gateBand,
+.ghost {
+  display: grid;
+  grid-template-columns: var(--when) var(--marker) minmax(0, 1fr);
+  column-gap: var(--col-gap);
+  align-items: start;
+}
+
+.entry {
+  position: relative;
+  padding-bottom: var(--space-5);
+  animation: arrive 180ms ease-out;
+}
+
+/* The rail: one continuous line through every step. */
+.entry::before {
+  content: "";
+  position: absolute;
+  left: var(--rail-x);
+  top: 20px;
+  bottom: 0;
+  width: 2px;
+  background: var(--rule-strong);
+}
+
+.entry:last-child::before {
+  display: none;
+}
+
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.when {
+  display: grid;
+  justify-items: end;
+  font-size: var(--text-xs);
+  line-height: 1.35;
+  padding-top: 2px;
+  color: var(--ink-2);
+}
+
+.offset {
+  color: var(--ink-3);
+}
+
+.dot {
+  justify-self: center;
+  margin-top: 5px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--ink-2);
+  display: grid;
+  place-items: center;
+  position: relative;
+  z-index: 1;
+}
+
+.body {
+  min-width: 0;
+}
+
+.title {
+  font-size: var(--text-sm);
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.title code {
+  font-size: 0.95em;
+}
+
+.meta {
+  margin-top: 2px;
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+.reasoning {
+  margin-top: var(--space-2);
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--rule-strong);
+  font-size: var(--text-sm);
+  max-width: 72ch;
+}
+
+.calls {
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.call {
+  padding: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-panel);
+}
+
+.callFailed {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--rule));
+}
+
+.callHead {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+}
+
+.signature {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.ok,
+.failed {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ok {
+  color: var(--success);
+}
+
+.failed {
+  color: var(--danger);
+}
+
+.ok span,
+.failed span {
+  color: var(--ink-3);
+  font-weight: 400;
+  margin-left: var(--space-1);
+}
+
+.summary {
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.details {
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.details summary {
+  cursor: pointer;
+  color: var(--ink-2);
+  font-weight: 600;
+  width: fit-content;
+}
+
+.details summary:hover {
+  color: var(--ink);
+}
+
+.good .dot {
+  border-color: var(--success);
+  background: var(--success);
+}
+
+.bad .dot {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.warn .dot {
+  border-color: var(--gate-bar);
+}
+
+.progress .meta {
+  font-style: italic;
+}
+
+.pulse {
+  border-color: var(--active);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--active) 20%, transparent);
+  }
+}
+
+/* The approval gate: a barrier across the rail. */
+.gate {
+  position: relative;
+  margin: var(--space-1) 0 var(--space-5);
+  animation: arrive 180ms ease-out;
+}
+
+.gateBand {
+  padding: var(--space-4) 0;
+  border-radius: 2px;
+}
+
+.gate_pending .gateBand {
+  background-image: var(--hazard), var(--hazard);
+  background-size: 100% 6px;
+  background-position:
+    left top,
+    left bottom;
+  background-repeat: no-repeat;
+  background-color: var(--gate-fill);
+}
+
+.gate_executing .gateBand,
+.gate_executed .gateBand {
+  background: var(--success-fill);
+  border-top: 3px solid var(--success);
+  border-bottom: 3px solid var(--success);
+}
+
+.gate_rejected .gateBand {
+  background: var(--neutral-fill);
+  border-top: 3px solid var(--neutral);
+  border-bottom: 3px solid var(--neutral);
+}
+
+.gate_failed .gateBand {
+  background: var(--danger-fill);
+  border-top: 3px solid var(--danger);
+  border-bottom: 3px solid var(--danger);
+}
+
+.gateMark {
+  justify-self: center;
+  width: 22px;
+  height: 22px;
+  color: var(--ink);
+}
+
+.gateText {
+  margin-top: 2px;
+  font-weight: 600;
+  font-size: var(--text-sm);
+}
+
+.gate_pending .gateText {
+  color: var(--gate-ink);
+}
+
+.gate .meta a {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* What waits behind the gate: drawn but not yet (or never) taken. */
+.ghost {
+  position: relative;
+  padding: var(--space-4) 0 0;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+
+.ghost::before {
+  content: "";
+  position: absolute;
+  left: var(--rail-x);
+  top: 0;
+  height: var(--space-4);
+  border-left: 2px dashed var(--rule-strong);
+}
+
+.ghost > p {
+  grid-column: 3;
+}
+
+.ghostDot {
+  grid-column: 2;
+  justify-self: center;
+  margin-top: 4px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px dashed var(--rule-strong);
+}
+
+.gate_rejected .ghost p {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+@media (max-width: 520px) {
+  .section {
+    --when: 58px;
+    --marker: 18px;
+    --col-gap: var(--space-2);
+  }
+
+  .offset {
+    display: none;
+  }
+}

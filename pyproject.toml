@@ -11,16 +11,20 @@ license = "MIT"
 authors = [{ name = "Shreyash Yadav" }]
 requires-python = ">=3.13"
 dependencies = [
+    "aiosqlite==0.22.1",
+    "fastapi==0.141.1",
     "httpx==0.28.1",
     "langchain-core==1.6.4",
     "langchain-mcp-adapters==0.3.2",
     "langchain-openai==1.6.5",
     "langgraph==1.2.12",
+    "langgraph-checkpoint-sqlite==3.1.1",
     "mcp==1.30.0",
     "pydantic==2.13.5",
     "python-dotenv==1.2.3",
     "pyyaml==6.0.3",
     "rich==15.0.0",
+    "uvicorn==0.53.0",
 ]
 
 [project.optional-dependencies]
@@ -34,9 +38,15 @@ dev = [
 opspilot = "opspilot_agent.cli:main"
 opspilot-mcp = "opspilot_mcp.__main__:main"
 opspilot-eval = "opspilot_evals.cli:main"
+opspilot-api = "opspilot_api.__main__:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["agent/opspilot_agent", "mcp-servers/opspilot_mcp", "evals/opspilot_evals"]
+packages = [
+    "agent/opspilot_agent",
+    "api/opspilot_api",
+    "mcp-servers/opspilot_mcp",
+    "evals/opspilot_evals",
+]
 
 [tool.ruff]
 line-length = 100
@@ -50,7 +60,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["opsdemo", "opspilot_agent", "opspilot_evals", "opspilot_mcp"]
+known-first-party = ["opsdemo", "opspilot_agent", "opspilot_api", "opspilot_evals", "opspilot_mcp"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

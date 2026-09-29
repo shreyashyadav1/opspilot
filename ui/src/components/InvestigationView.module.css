@@ -1,0 +1,113 @@
+.page {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: fit-content;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ink-2);
+  text-decoration: none;
+}
+
+.back:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.header {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.titleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.titleRow h1 {
+  overflow-wrap: anywhere;
+}
+
+.facts {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-6);
+}
+
+.facts dt {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  font-weight: 600;
+}
+
+.facts dd {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.model {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.live {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.liveDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 420px;
+  grid-template-areas: "main side";
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.side {
+  grid-area: side;
+  display: grid;
+  gap: var(--space-5);
+}
+
+.main {
+  grid-area: main;
+  min-width: 0;
+}
+
+.loading {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+}
+
+@media (max-width: 1080px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "side"
+      "main";
+  }
+}

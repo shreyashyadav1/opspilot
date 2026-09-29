@@ -27,7 +27,9 @@ from opsdemo.control_plane.chaos import (
     ControlPlane,
     FaultRecord,
     FaultRequest,
+    FaultTypeInfo,
     ServiceAdmin,
+    fault_catalog,
 )
 from opsdemo.control_plane.deploys import (
     BASELINES,
@@ -120,6 +122,12 @@ async def rollback(request: Request, service: str, body: RollbackRequest) -> Dep
 
 
 # -- chaos (benchmark harness only) --------------------------------------------------------
+
+
+@app.get("/chaos/catalog")
+def catalog() -> dict[str, list[FaultTypeInfo]]:
+    """Fault types with their ground-truth category, allowed targets and parameter bounds."""
+    return {"fault_types": fault_catalog()}
 
 
 @app.get("/chaos/faults")

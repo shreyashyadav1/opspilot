@@ -72,6 +72,11 @@ flowchart LR
         RUN["benchmark runner + scorer"]
     end
 
+    subgraph ops["api + ui"]
+        UI["dashboard<br/>Next.js"]
+        API["agent API<br/>FastAPI, SQLite checkpoints"]
+    end
+
     LLM["LLM endpoint<br/>(OpenAI-compatible, Groq by default)"]
 
     MCP -->|PromQL| PROM
@@ -82,10 +87,13 @@ flowchart LR
     AG <-->|chat completions + tool calls| LLM
     RUN -->|reset, inject fault, read ground truth| CP
     RUN -->|runs, auto-approves or rejects| AG
-    Human((on-call engineer)) -->|approve / reject| AG
+    UI -->|"/api proxy, SSE"| API
+    API -->|runs and resumes| AG
+    API -. "demo faults only" .-> CP
+    Human((on-call engineer)) -->|approve / reject| UI
 ```
 
-The system has four parts that can be developed and tested independently:
+The system has six parts that can be developed and tested independently:
 
 | Part | Path | Language | Role |
 | --- | --- | --- | --- |
@@ -93,6 +101,8 @@ The system has four parts that can be developed and tested independently:
 | MCP server | `mcp-servers/` | Python (`mcp` SDK) | The agent's only interface to the system |
 | Agent | `agent/` | Python (LangGraph) | Investigation loop, diagnosis, approval gate |
 | Benchmark | `evals/` | Python | Scenarios, runner, scoring, reports |
+| Agent API | `api/` | Python (FastAPI) | Runs investigations in the background, persists them, applies approval decisions |
+| Dashboard | `ui/` | TypeScript (Next.js) | Incident list, investigation timeline, approve and reject, benchmark browser |
 
 A hard boundary runs between the benchmark harness and the agent. The harness talks to the
 chaos API and sees ground truth; the agent only sees what the MCP tools return. The MCP server
@@ -205,8 +215,8 @@ stateDiagram-v2
 - **investigate**: calls the model with the system prompt, the alert and the conversation so far.
   Only read-only MCP tools and a local `submit_diagnosis` tool are bound to the model.
 - **tools**: executes the requested tool calls, truncates oversized results, and records a
-  trace entry per call (name, arguments, success, latency). Calls to unknown or write tools are
-  refused with an error message the model can recover from.
+  trace entry per call (name, arguments, call id, start time, success, latency). Calls to
+  unknown or write tools are refused with an error message the model can recover from.
 - **validate**: parses the `submit_diagnosis` arguments into the `Diagnosis` Pydantic model.
   Validation errors go back to the model as a tool error, up to a retry limit.
 - **approval_gate**: if the proposed action is executable, the graph calls LangGraph's
@@ -279,6 +289,47 @@ request with the configured policy, score, reset. Two environments share this fl
 - `live`: the docker compose stack with real fault injection. Used for the real benchmark.
 
 Results are written as JSON (full traces) plus a Markdown summary table.
+
+### 3.5 Agent API and dashboard (`api/opspilot_api`, `ui/`)
+
+The API runs the same graph as the CLI and the benchmark, for people instead of a policy.
+
+| Endpoint | Purpose |
+| --- | --- |
+| `POST /investigations` | Alert title, optional service, details and firing time; optional model. Starts a background run and returns `201` |
+| `GET /investigations`, `GET /investigations/{id}` | Status, trace, diagnosis, proposed action, approval request and decision |
+| `GET /investigations/{id}/events` | The same record as Server-Sent Events: a `snapshot` on every change, then `end` |
+| `POST /investigations/{id}/decision` | `{"decision": "approve" \| "reject", "reviewer", "comment"}` |
+| `GET /config` | Model in use (and whether it can run), models on offer, telemetry backend |
+| `GET /demo/catalog`, `/demo/faults`, `POST /demo/faults`, `/demo/reset` | Proxy to the chaos API, enabled by `OPSPILOT_CHAOS_URL` |
+| `GET /benchmarks`, `/benchmarks/{run}` | Benchmark runs found in `evals/results` |
+
+- **Runs.** Each investigation is an asyncio task (at most two at a time by default) with its
+  own MCP stdio session, closed when the graph pauses. Every node update becomes a trace event
+  with a timestamp; tool calls keep their arguments, a one-line summary of the result and the
+  parsed output. The model defaults to `fake:playbook`, or to the default LLM when
+  `GROQ_API_KEY` is set; the playbook stays available as a baseline either way.
+- **Persistence.** Two SQLite files, one connection each: LangGraph's `AsyncSqliteSaver` holds
+  the checkpoints the graph resumes from, and a small store holds the investigation records and
+  trace events (the read model and audit trail). A run paused at the approval gate lives in its
+  checkpoint, so pending approvals survive restarts.
+- **Decisions.** A decision is accepted only while the record says `awaiting_approval` and the
+  checkpoint still has the interrupt; a per-investigation lock makes concurrent decisions
+  resolve to exactly one. Approving resumes the checkpoint with a fresh tool session. Rejecting
+  resumes it on a graph built without any tools, so there is nothing it could execute.
+- **Restarts.** On startup, unfinished records are reconciled with their checkpoints: a pending
+  interrupt stays pending (and a decision that never reached the graph is withdrawn), a
+  finished graph is settled, and anything cut off mid-run is marked failed. Nothing is
+  retried, so nothing runs twice.
+- **Boundary.** The demo endpoints belong to the harness side. The MCP server still never sees
+  the chaos API, and `OPSPILOT_CHAOS_URL` is not passed to it.
+
+The dashboard is a Next.js App Router app. The browser only talks to its own origin: a route
+handler proxies `/api/*` to `OPSPILOT_API_URL` and passes event streams through. Pages: the
+incident list (pending decisions first) with the start form and the demo fault panel; the
+investigation page, with a live timeline in which the approval gate is drawn across the steps,
+the diagnosis, and the decision panel; and the benchmark browser, which lists only runs that
+exist and labels the playbook as a rule-based baseline and simulated runs as harness checks.
 
 ## 4. Data flow for one incident
 
@@ -356,6 +407,12 @@ Rules and caveats:
 - API keys are read from `.env` (gitignored). Only `.env.example` is committed.
 - Admin and chaos endpoints exist only on the internal Docker network plus localhost port
   mappings for development; they are not part of the agent's tool surface.
+- The agent API and the dashboard have no authentication yet, and the reviewer name on a
+  decision is self-declared. They are for local use; authentication and roles come before any
+  shared deployment.
+- In docker compose, the agent API mounts the Docker socket so that the MCP server can read
+  container logs. That grants control of the Docker daemon, which is acceptable for a local
+  demo only; a cluster deployment reads logs from a log backend instead (M7).
 
 ## 7. Milestones
 
@@ -378,10 +435,14 @@ Rules and caveats:
   - [x] Runner, scorer, JSON and Markdown reports
   - [x] Deterministic CI run with the playbook model
   - [ ] First real benchmark run against a hosted model, published with model, date and commit
-- [ ] **M5: Operator dashboard** (Next.js + TypeScript)
-  - [ ] Incident list and detail view with the agent's reasoning trace and tool calls
-  - [ ] Approve and reject actions from the UI (agent served behind a FastAPI API)
-  - [ ] Benchmark results browser
+- [x] **M5: Operator dashboard** (Next.js + TypeScript)
+  - [x] Agent API (FastAPI): background investigations, SQLite checkpoints so pending approvals
+        survive restarts, Server-Sent Events, demo fault injection through the chaos API
+  - [x] Incident list and detail view with the agent's reasoning trace and tool calls
+  - [x] Approve and reject actions from the UI; a rejected action never executes
+  - [x] Benchmark results browser that labels the rule-based baseline
+  - [x] Tests: pytest for the API, Vitest and Testing Library for components, Playwright smoke
+        tests with accessibility checks; CI jobs and docker compose services
 - [ ] **M6: Agent observability**
   - [ ] Trace every agent run (Langfuse or OpenTelemetry GenAI conventions): model calls,
         tool calls, latency and tokens per step
