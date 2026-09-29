@@ -1,0 +1,216 @@
+/*
+ * OpsPilot dashboard tokens.
+ * Ink on cool paper; amber is reserved for the approval gate, the one place where a person
+ * has to act. Status colors always come with a text label and an icon shape.
+ */
+
+:root {
+  color-scheme: light;
+
+  --paper: #f2f4f6;
+  --surface: #ffffff;
+  --surface-sunk: #f6f8fa;
+  --ink: #15253a;
+  --ink-2: #46566a;
+  --ink-3: #5f6e80;
+  --rule: #d6dde5;
+  --rule-strong: #aebccb;
+  --focus: #1d5fb8;
+
+  --gate-ink: #8a4500;
+  --gate-bar: #e0820c;
+  --gate-fill: #fff3e0;
+
+  --active: #1a56a8;
+  --active-fill: #e8f0fb;
+  --attention: #8a4500;
+  --attention-fill: #fff3e0;
+  --success: #17683a;
+  --success-fill: #e5f3ea;
+  --info: #0c6470;
+  --info-fill: #e2f2f4;
+  --neutral: #4d5a67;
+  --neutral-fill: #edf0f3;
+  --danger: #a8231b;
+  --danger-fill: #fbe9e8;
+
+  --button-ink: #ffffff;
+  --button-fill: #15253a;
+  --button-fill-hover: #253a55;
+
+  --font-body: var(--font-sans), "Segoe UI", system-ui, sans-serif;
+  --font-code: var(--font-mono), ui-monospace, "SF Mono", Menlo, monospace;
+
+  --text-xs: 0.8125rem;
+  --text-sm: 0.9375rem;
+  --text-base: 1rem;
+  --text-lg: 1.1875rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 2rem;
+  --text-display: 2.75rem;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  --radius-control: 6px;
+  --radius-panel: 3px;
+  --page-width: 1240px;
+  --gutter: 24px;
+
+  /* The gate's hazard band: a physical barrier, drawn quietly. */
+  --hazard: repeating-linear-gradient(-45deg, var(--gate-bar) 0 6px, transparent 6px 12px);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --paper: #0f1722;
+    --surface: #172230;
+    --surface-sunk: #121c28;
+    --ink: #e6edf5;
+    --ink-2: #b3c0cf;
+    --ink-3: #97a5b6;
+    --rule: #2a3a4e;
+    --rule-strong: #43566e;
+    --focus: #7fb0ff;
+
+    --gate-ink: #ffb65e;
+    --gate-bar: #d87c0b;
+    --gate-fill: #2e2211;
+
+    --active: #9cc2ff;
+    --active-fill: #172a44;
+    --attention: #ffb65e;
+    --attention-fill: #2e2211;
+    --success: #86d9a6;
+    --success-fill: #12291c;
+    --info: #7dd3de;
+    --info-fill: #0f2a2f;
+    --neutral: #b3c0cf;
+    --neutral-fill: #1f2a37;
+    --danger: #ff9f97;
+    --danger-fill: #341a1a;
+
+    --button-ink: #0f1722;
+    --button-fill: #e6edf5;
+    --button-fill-hover: #c9d5e2;
+  }
+}
+
+@media (max-width: 640px) {
+  :root {
+    --gutter: 16px;
+    --text-2xl: 1.625rem;
+    --text-display: 2.25rem;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  font-kerning: normal;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  line-height: 1.2;
+  font-weight: 650;
+  letter-spacing: -0.005em;
+}
+
+h1 {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+}
+
+h2 {
+  font-size: var(--text-lg);
+}
+
+h3 {
+  font-size: var(--text-base);
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 1px;
+}
+
+code,
+pre,
+kbd {
+  font-family: var(--font-code);
+  font-size: 0.875em;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--focus) 25%, transparent);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.numeric {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
