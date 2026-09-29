@@ -224,4 +224,5 @@ class ServiceConfig(BaseModel):
     model: ModelInfo
     models: list[ModelInfo]
     model_error: str | None
+    demo_enabled: bool
     services: list[str]
