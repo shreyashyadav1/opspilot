@@ -68,7 +68,8 @@ def build_server(backend: TelemetryBackend, name: str = "opspilot-observability"
         Metrics: request_rate (req/s), error_rate (share of 5xx, 0-1), latency_p50/p95/p99
         (ms), upstream_error_rate and upstream_latency_p95 (outbound calls, per dependency),
         db_pool_active and db_pool_pending (orders only), up (1 if Prometheus can scrape it).
-        Returns latest, baseline (start of window), min, max, trend and a few points.
+        Returns latest, baseline (median of the first half of the window), min, max, trend
+        and a few points.
         """
         definition = METRICS[metric]
         if definition.only_for and service not in definition.only_for:

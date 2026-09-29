@@ -7,6 +7,7 @@ Micrometer-style metric names, so one template per metric covers them all.
 from __future__ import annotations
 
 import math
+import statistics
 from dataclasses import dataclass
 from typing import Any, Literal, get_args
 
@@ -56,8 +57,10 @@ METRICS: dict[str, MetricDefinition] = {
     "error_rate": MetricDefinition(
         "ratio",
         "Share of business requests answered with a 5xx status (0-1).",
-        f'sum(rate(http_server_requests_seconds_count{{job="$job",{_BUSINESS},status=~"5.."}}[1m]))'
-        f' / sum(rate(http_server_requests_seconds_count{{job="$job",{_BUSINESS}}}[1m]))',
+        # "or vector(0)": a service that has never returned a 5xx has no 5xx series at all.
+        f'(sum(rate(http_server_requests_seconds_count{{job="$job",{_BUSINESS},status=~"5.."}}'
+        f"[1m])) or vector(0)) / sum(rate(http_server_requests_seconds_count"
+        f'{{job="$job",{_BUSINESS}}}[1m]))',
     ),
     "latency_p50": MetricDefinition("ms", "Median request latency.", _quantile(0.5)),
     "latency_p95": MetricDefinition("ms", "95th percentile request latency.", _quantile(0.95)),
@@ -65,8 +68,9 @@ METRICS: dict[str, MetricDefinition] = {
     "upstream_error_rate": MetricDefinition(
         "ratio",
         "Share of this service's outbound calls that failed (5xx or no response), per dependency.",
-        'sum by (client_name) (rate(http_client_requests_seconds_count{job="$job",'
-        'outcome=~"SERVER_ERROR|UNKNOWN"}[1m])) / sum by (client_name) '
+        '(sum by (client_name) (rate(http_client_requests_seconds_count{job="$job",'
+        'outcome=~"SERVER_ERROR|UNKNOWN"}[1m])) or sum by (client_name) '
+        '(rate(http_client_requests_seconds_count{job="$job"}[1m])) * 0) / sum by (client_name) '
         '(rate(http_client_requests_seconds_count{job="$job"}[1m]))',
     ),
     "upstream_latency_p95": MetricDefinition(
@@ -128,19 +132,19 @@ def _trend(baseline: float | None, latest: float | None, unit: str) -> str:
 
 
 def summarize_series(series: Series, unit: str) -> dict[str, Any]:
-    """Latest vs. baseline (first quarter of the window), extremes, trend and a few points.
+    """Latest vs. baseline, extremes, trend and a few points.
 
-    Points cover the whole window; gaps are None. A value only counts as "latest" if it is
-    among the last three points, so a service that stopped reporting shows as missing data
-    instead of its last healthy value.
+    The baseline is the median of the first half of the window, which tolerates a short
+    earlier spike. Points cover the whole window with gaps as None; a value only counts as
+    "latest" if it is among the last three points, so a service that stopped reporting shows
+    as missing data instead of its last healthy value.
     """
     values = [(ts, _clean(v)) for ts, v in series.points]
     present = [(ts, v) for ts, v in values if v is not None]
-    quarter = values[: max(1, len(values) // 4)]
-    baseline_values = [v for _, v in quarter if v is not None]
+    first_half = [v for _, v in values[: max(1, len(values) // 2)] if v is not None]
     recent = [v for _, v in values[-3:] if v is not None]
     latest = recent[-1] if recent else None
-    baseline = sum(baseline_values) / len(baseline_values) if baseline_values else None
+    baseline = statistics.median(first_half) if first_half else None
 
     step = max(1, math.ceil(len(values) / MAX_POINTS))
     sampled = values[::step]
