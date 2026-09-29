@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Lint, tests, deterministic benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements.lock
+
+      - name: Install pinned dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.lock
+          pip install --no-deps -e .
+
+      - name: Lint
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Unit tests (integration tests skip without the demo stack)
+        run: pytest
+
+      - name: Benchmark with the playbook model in the simulated environment
+        run: >
+          opspilot-eval --env simulated --model fake:playbook
+          --fail-under 1.0 --out-dir eval-results
+
+      - name: Upload benchmark report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: eval-fake-results
+          path: eval-results/
+          if-no-files-found: ignore
+
+  demo-system:
+    name: Demo system images (includes the orders Maven build and JUnit tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Validate compose file
+        run: docker compose -f demo-system/docker-compose.yml config --quiet
+
+      - name: Build images
+        run: docker compose -f demo-system/docker-compose.yml build
