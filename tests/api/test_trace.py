@@ -60,6 +60,16 @@ from opspilot_api.trace import events_from_update, parse_output, summarize
             "No recent data. The service may be down.",
         ),
         (
+            "query_metric",
+            {
+                "service": "orders",
+                "metric": "error_rate",
+                "unit": "ratio",
+                "series": [{"latest": 0.806, "baseline": None, "trend": "new"}],
+            },
+            "orders error_rate: 80.6%, no baseline in the window yet.",
+        ),
+        (
             "search_logs",
             {
                 "total_matched": 42,

@@ -180,12 +180,16 @@ def _metric_evidence(findings: _Findings, service: str) -> list[dict[str, Any]]:
     for metric, unit in (("error_rate", ""), ("latency_p95", " ms")):
         m = findings.metric(service, metric)
         if m.get("latest") is not None:
+            baseline = (
+                f"vs baseline {m['baseline']}{unit}"
+                if m.get("baseline") is not None
+                else "with no baseline in the window yet"
+            )
             evidence.append(
                 {
                     "source": "metrics",
                     "service": service,
-                    "detail": f"{metric} {m['latest']}{unit} vs baseline {m['baseline']}{unit} "
-                    f"({m['trend']})",
+                    "detail": f"{metric} {m['latest']}{unit} {baseline} ({m['trend']})",
                 }
             )
     return evidence

@@ -59,10 +59,10 @@ def _metric(payload: dict[str, Any]) -> str:
     labels = s.get("labels") or {}
     scope = f" ({', '.join(f'{k}={v}' for k, v in labels.items())})" if labels else ""
     more = f" (+{len(series) - 1} more series)" if len(series) > 1 else ""
-    return (
-        f"{payload.get('service')} {payload.get('metric')}{scope}: {_num(s.get('latest'), unit)} "
-        f"vs baseline {_num(s.get('baseline'), unit)}, {s.get('trend')}{more}."
-    )
+    head = f"{payload.get('service')} {payload.get('metric')}{scope}: {_num(s.get('latest'), unit)}"
+    if s.get("baseline") is None:
+        return f"{head}, no baseline in the window yet{more}."
+    return f"{head} vs baseline {_num(s.get('baseline'), unit)}, {s.get('trend')}{more}."
 
 
 def _logs(payload: dict[str, Any]) -> str:

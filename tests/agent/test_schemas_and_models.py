@@ -73,3 +73,12 @@ def test_groq_model_is_openai_compatible(monkeypatch):
 def test_bad_model_specs(spec):
     with pytest.raises(ModelSpecError):
         build_model(spec)
+
+
+def test_playbook_evidence_names_a_missing_baseline():
+    from opspilot_agent.llm.fake import _Findings, _metric_evidence
+
+    findings = _Findings([])
+    findings.metrics[("orders", "error_rate")] = {"latest": 0.8, "baseline": None, "trend": "new"}
+    [evidence] = _metric_evidence(findings, "orders")
+    assert evidence["detail"] == "error_rate 0.8 with no baseline in the window yet (new)"
