@@ -1,0 +1,21 @@
+id: payments-latency-spike
+title: Payments latency spike slows checkout
+description: >
+  Every charge takes about 1.2 s longer. Checkout slows down end to end; nothing fails.
+  The alert fires at the edge (storefront), two hops away from the cause.
+alert:
+  title: Checkout p95 latency above SLO
+  service: storefront
+  details: POST /checkout p95 latency is above the 800 ms SLO.
+fault:
+  type: latency_spike
+  target: payments
+  params: {delay_ms: 1200}
+expected:
+  root_cause_service: payments
+  category: latency
+  action: {type: escalate, target_service: payments}
+# Symptoms show on the whole path, so any of these services is worth inspecting.
+relevant_services: [payments, orders, storefront]
+required_evidence:
+  - {tool: query_metric, service: payments}

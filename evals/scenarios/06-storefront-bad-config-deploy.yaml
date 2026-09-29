@@ -1,0 +1,20 @@
+id: storefront-bad-config-deploy
+title: Storefront deploy sets an unrealistic upstream timeout
+description: >
+  A storefront deploy lowers the orders timeout from 2000 ms to 20 ms. Storefront logs read
+  like orders is slow, but orders' own metrics are healthy: the cause is the storefront config.
+alert:
+  title: Checkout error rate above SLO
+  service: storefront
+  details: POST /checkout is returning 504 Gateway Timeout for a large share of requests.
+fault:
+  type: bad_config_deploy
+  target: storefront
+expected:
+  root_cause_service: storefront
+  category: bad_deploy
+  action: {type: rollback_deploy, target_service: storefront}
+relevant_services: [storefront, orders]
+required_evidence:
+  - {tool: get_recent_deploys}
+  - {tool: search_logs, service: storefront}

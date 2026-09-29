@@ -1,0 +1,20 @@
+id: orders-bad-config-deploy
+title: Orders deploy points payment calls at a host that does not exist
+description: >
+  An orders deploy changes payments.base-url to payments-v2, which does not resolve. Every
+  checkout fails in orders; payments stops receiving traffic but is healthy.
+alert:
+  title: Checkout error rate above SLO
+  service: storefront
+  details: POST /checkout 5xx rate is above the 2% SLO.
+fault:
+  type: bad_config_deploy
+  target: orders
+expected:
+  root_cause_service: orders
+  category: bad_deploy
+  action: {type: rollback_deploy, target_service: orders}
+relevant_services: [orders, storefront, payments]
+required_evidence:
+  - {tool: get_recent_deploys}
+  - {tool: search_logs, service: orders}

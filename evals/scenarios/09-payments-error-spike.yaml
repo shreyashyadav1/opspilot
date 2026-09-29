@@ -1,0 +1,23 @@
+id: payments-error-spike
+title: Payments throws on a share of charges, right after a storefront deploy
+description: >
+  40% of charges fail with a TypeError in payments. A harmless storefront deploy landed shortly
+  before the errors started; blaming it would be wrong.
+alert:
+  title: Checkout error rate above SLO
+  service: storefront
+  details: POST /checkout 5xx rate is above the 2% SLO.
+fault:
+  type: error_spike
+  target: payments
+  params: {error_rate: 0.4}
+distractors:
+  - {type: benign_deploy, service: storefront, minutes_ago: 7}
+expected:
+  root_cause_service: payments
+  category: error_rate
+  action: {type: escalate, target_service: payments}
+relevant_services: [payments, orders, storefront]
+required_evidence:
+  - {tool: query_metric, service: payments}
+  - {tool: search_logs, service: payments}

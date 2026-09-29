@@ -1,0 +1,9 @@
+# USD per million tokens, used to price token usage reported by the provider.
+# Check the provider's current price list before publishing results; models not listed here
+# are reported with an unknown cost.
+groq:llama-3.3-70b-versatile:
+  input: 0.59
+  output: 0.79
+fake:playbook:
+  input: 0.0
+  output: 0.0

@@ -1,0 +1,19 @@
+id: payments-outage
+title: Payments is down
+description: >
+  Payments stops serving: every endpoint returns 503, health checks fail and Prometheus can no
+  longer scrape it. Orders returns 502 for checkouts; order lookups still work.
+alert:
+  title: Checkout error rate above SLO
+  service: storefront
+  details: POST /checkout 5xx rate is above the 2% SLO.
+fault:
+  type: dependency_outage
+  target: payments
+expected:
+  root_cause_service: payments
+  category: dependency_outage
+  action: {type: escalate, target_service: payments}
+relevant_services: [payments, orders, storefront]
+required_evidence:
+  - {tool: get_service_health}

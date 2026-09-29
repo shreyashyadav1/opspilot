@@ -1,0 +1,20 @@
+id: orders-latency-spike
+title: Orders latency spike
+description: >
+  Orders requests take about 900 ms longer. Payments is healthy; storefront is slow because it
+  waits on orders.
+alert:
+  title: Checkout p95 latency above SLO
+  service: storefront
+  details: POST /checkout and GET /orders/{id} p95 latency is above the 800 ms SLO.
+fault:
+  type: latency_spike
+  target: orders
+  params: {delay_ms: 900}
+expected:
+  root_cause_service: orders
+  category: latency
+  action: {type: escalate, target_service: orders}
+relevant_services: [orders, storefront]
+required_evidence:
+  - {tool: query_metric, service: orders}

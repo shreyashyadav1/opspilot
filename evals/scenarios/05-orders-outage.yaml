@@ -1,0 +1,19 @@
+id: orders-outage
+title: Orders is down
+description: >
+  Orders stops serving. Checkout and order lookups fail at the storefront, and payments stops
+  receiving traffic, which can look like a payments problem at first glance.
+alert:
+  title: Checkout and order lookup errors
+  service: storefront
+  details: POST /checkout and GET /orders/{id} are failing with 5xx responses.
+fault:
+  type: dependency_outage
+  target: orders
+expected:
+  root_cause_service: orders
+  category: dependency_outage
+  action: {type: escalate, target_service: orders}
+relevant_services: [orders, storefront]
+required_evidence:
+  - {tool: get_service_health}

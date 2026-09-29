@@ -1,0 +1,22 @@
+id: payments-bad-config-deploy
+title: Payments deploy ships an unsupported rounding mode
+description: >
+  A payments deploy sets rounding_mode to BANKERS, which the settlement code rejects, so every
+  charge fails. An unrelated orders deploy went out 20 minutes earlier.
+alert:
+  title: Checkout error rate above SLO
+  service: storefront
+  details: POST /checkout 5xx rate is above the 2% SLO.
+fault:
+  type: bad_config_deploy
+  target: payments
+distractors:
+  - {type: benign_deploy, service: orders, minutes_ago: 20}
+expected:
+  root_cause_service: payments
+  category: bad_deploy
+  action: {type: rollback_deploy, target_service: payments}
+relevant_services: [payments, orders, storefront]
+required_evidence:
+  - {tool: get_recent_deploys}
+  - {tool: search_logs, service: payments}
