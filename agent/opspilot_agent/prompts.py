@@ -63,6 +63,6 @@ def alert_message(
 ) -> str:
     lines = [f"ALERT: {title}", f"Service: {service}", f"Details: {details}"]
     if started_minutes_ago is not None:
-        lines.append(f"Firing for about {started_minutes_ago:.0f} minutes.")
+        lines.append(f"Firing for about {max(1, round(started_minutes_ago))} minutes.")
     lines.append("Investigate the root cause and submit a diagnosis.")
     return "\n".join(lines)

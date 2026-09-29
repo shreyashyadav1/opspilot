@@ -11,11 +11,12 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Sequence
 from typing import Any
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.utils.function_calling import convert_to_openai_tool
 from pydantic import PrivateAttr
@@ -23,6 +24,16 @@ from pydantic import PrivateAttr
 from opspilot_agent.prompts import SUBMIT_TOOL
 
 DOWNSTREAM_FIRST = ("payments", "orders", "storefront")
+_FIRING = re.compile(r"Firing for about (\d+) minutes")
+
+
+def _log_window_minutes(messages: Sequence[BaseMessage]) -> int:
+    """Search logs from shortly before the alert fired; older errors belong to other events."""
+    for message in messages:
+        text = message.content if isinstance(message, HumanMessage) else None
+        if isinstance(text, str) and (match := _FIRING.search(text)):
+            return int(match.group(1)) + 1
+    return 15
 
 
 def _estimate_tokens(value: Any) -> int:
@@ -129,15 +140,17 @@ class _Findings:
     def metric(self, service: str, metric: str) -> dict[str, Any]:
         return self.metrics.get((service, metric), {})
 
+    # Compared against the window minimum: the quietest recent value is the best available
+    # picture of normal, even when earlier incidents are still visible in the window.
     def errors_up(self, service: str) -> bool:
         m = self.metric(service, "error_rate")
-        latest, baseline = m.get("latest"), m.get("baseline") or 0.0
-        return latest is not None and latest > max(0.05, 3 * baseline)
+        latest, normal = m.get("latest"), m.get("min") or 0.0
+        return latest is not None and latest > max(0.05, 3 * normal)
 
     def slower(self, service: str) -> bool:
         m = self.metric(service, "latency_p95")
-        latest, baseline = m.get("latest"), m.get("baseline")
-        return latest is not None and bool(baseline) and latest > max(2 * baseline, baseline + 200)
+        latest, normal = m.get("latest"), m.get("min")
+        return latest is not None and normal is not None and latest > max(2 * normal, normal + 200)
 
     def unhealthy(self, service: str) -> bool:
         return self.health.get(service, {}).get("status", "healthy") != "healthy"
@@ -283,7 +296,10 @@ class PlaybookChatModel(_FakeBase):
             ]
         elif turn == 2:
             suspect = findings.suspect()
-            calls = [("search_logs", {"service": suspect, "level": "WARN"})]
+            window = _log_window_minutes(messages)
+            calls = [
+                ("search_logs", {"service": suspect, "level": "WARN", "since_minutes": window})
+            ]
             if suspect == "orders":
                 calls.append(("query_metric", {"service": "orders", "metric": "db_pool_pending"}))
         else:

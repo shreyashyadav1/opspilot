@@ -41,7 +41,12 @@ async def run_scenario(
     config: AgentConfig,
 ) -> dict[str, Any]:
     prepared = await environment.prepare(scenario)
-    alert = alert_message(scenario.alert.title, scenario.alert.service, scenario.alert.details)
+    alert = alert_message(
+        scenario.alert.title,
+        scenario.alert.service,
+        scenario.alert.details,
+        started_minutes_ago=prepared.started_minutes_ago,
+    )
     error = None
     investigation: dict[str, Any] = {}
     try:

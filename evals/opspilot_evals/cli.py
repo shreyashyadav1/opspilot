@@ -39,7 +39,9 @@ async def _main(args: argparse.Namespace) -> int:
         if args.env == "simulated":
             environment = SimulatedEnvironment(Path(workdir))
         else:
-            environment = LiveEnvironment(warmup_seconds=args.warmup_seconds)
+            environment = LiveEnvironment(
+                warmup_seconds=args.warmup_seconds, cooldown_seconds=args.cooldown_seconds
+            )
         try:
             run = await run_benchmark(
                 scenarios,
@@ -82,6 +84,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--approval", choices=["approve", "reject"], default="approve")
     parser.add_argument("--max-turns", type=int, default=12)
     parser.add_argument("--warmup-seconds", type=int, default=None, help="override (live env)")
+    parser.add_argument("--cooldown-seconds", type=int, default=120, help="after reset (live)")
     parser.add_argument("--pricing", type=Path, default=EVALS_DIR / "pricing.yaml")
     parser.add_argument("--results", type=Path, default=EVALS_DIR / "results")
     parser.add_argument("--out-dir", type=Path, default=None)

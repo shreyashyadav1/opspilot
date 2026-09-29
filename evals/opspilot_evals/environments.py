@@ -33,6 +33,7 @@ BENIGN_CHANGES = {
 class Prepared:
     connection: Any
     ground_truth: GroundTruth
+    started_minutes_ago: float
     fault_id: str | None = None
 
 
@@ -68,7 +69,11 @@ class SimulatedEnvironment:
         truth = GroundTruth(
             service=scenario.fault.target, category=FAULT_CATEGORY[scenario.fault.type].value
         )
-        return Prepared(connection=stdio_connection("simulated", path), ground_truth=truth)
+        return Prepared(
+            connection=stdio_connection("simulated", path),
+            ground_truth=truth,
+            started_minutes_ago=spec.onset_minutes_ago,
+        )
 
     async def remediated(self, scenario: Scenario, prepared: Prepared, result: dict) -> bool | None:
         action = result.get("action_result")
@@ -94,10 +99,14 @@ class LiveEnvironment:
         self,
         control_plane_url: str = "http://localhost:8190",
         warmup_seconds: int | None = None,
+        cooldown_seconds: int = 120,
         client: httpx.AsyncClient | None = None,
     ) -> None:
         self.url = control_plane_url.rstrip("/")
         self.warmup_seconds = warmup_seconds
+        # After a reset, let healthy traffic run before the next fault: the metric history then
+        # shows a clean "before", and the previous scenario's errors age out of recent logs.
+        self.cooldown_seconds = cooldown_seconds
         self.client = client or httpx.AsyncClient(timeout=15.0)
         self.backend = LiveBackend()
 
@@ -120,6 +129,7 @@ class LiveEnvironment:
     async def prepare(self, scenario: Scenario) -> Prepared:
         await self._post("/chaos/reset")
         await self.wait_until_healthy()
+        await asyncio.sleep(self.cooldown_seconds)
         for distractor in scenario.distractors:
             summary, author = BENIGN_CHANGES[distractor.service]
             await self._post(
@@ -144,7 +154,10 @@ class LiveEnvironment:
         log.info("Injected %s into %s; waiting %ss", record["type"], record["target"], warmup)
         await asyncio.sleep(warmup)
         return Prepared(
-            connection=stdio_connection("live"), ground_truth=truth, fault_id=record["id"]
+            connection=stdio_connection("live"),
+            ground_truth=truth,
+            started_minutes_ago=warmup / 60,
+            fault_id=record["id"],
         )
 
     async def remediated(self, scenario: Scenario, prepared: Prepared, result: dict) -> bool | None:
