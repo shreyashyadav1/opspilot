@@ -88,6 +88,10 @@ class Usage(BaseModel):
     tool_calls: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
+    # None when the model in use has no entry in the price table (see ApiSettings.pricing_file);
+    # a baseline model such as fake:playbook has an entry priced at zero, so its cost is 0.0, not
+    # None, which is what tells the dashboard it is a real "no cost" rather than an unknown one.
+    cost_usd: float | None = None
 
 
 class Approval(BaseModel):
@@ -119,11 +123,15 @@ class InvestigationRecord(BaseModel):
     diagnosis: dict[str, Any] | None = None
     diagnosed_at: datetime | None = None
     approval_request: dict[str, Any] | None = None
+    approval_requested_at: datetime | None = None
     approval: Approval | None = None
     action_result: dict[str, Any] | None = None
     outcome: str | None = None
     usage: Usage = Field(default_factory=Usage)
     error: str | None = None
+    # The investigation's root span, as a W3C traceparent string: lets a decision made minutes
+    # or an API restart later still record its "approval_wait" span in the same trace.
+    trace_parent: str | None = None
 
 
 ApprovalState = Literal["not_required", "pending", "approved", "rejected"]
@@ -154,6 +162,14 @@ class InvestigationSummary(BaseModel):
         return cls(**_summary_fields(record))
 
 
+def trace_id_of(trace_parent: str | None) -> str | None:
+    """The hex trace id inside a W3C traceparent string ("00-<trace_id>-<span_id>-<flags>")."""
+    if not trace_parent:
+        return None
+    parts = trace_parent.split("-")
+    return parts[1] if len(parts) == 4 else None
+
+
 class InvestigationDetail(InvestigationSummary):
     started_at: datetime | None
     diagnosis: dict[str, Any] | None
@@ -164,6 +180,7 @@ class InvestigationDetail(InvestigationSummary):
     time_to_diagnosis_s: float | None
     error: str | None
     trace: list[TraceEvent]
+    trace_id: str | None = None
 
     @classmethod
     def build(cls, record: InvestigationRecord, trace: list[TraceEvent]) -> InvestigationDetail:
@@ -181,6 +198,7 @@ class InvestigationDetail(InvestigationSummary):
             time_to_diagnosis_s=time_to_diagnosis,
             error=record.error,
             trace=trace,
+            trace_id=trace_id_of(record.trace_parent),
         )
 
 

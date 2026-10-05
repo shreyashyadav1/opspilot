@@ -41,6 +41,7 @@ from opspilot_api.service import InvestigationService, ModelFactory, ToolsetFact
 from opspilot_api.settings import ApiSettings
 from opspilot_api.store import InvestigationStore
 from opspilot_mcp.catalog import SERVICES
+from opspilot_observability.tracing import configure
 
 log = logging.getLogger(__name__)
 
@@ -83,6 +84,7 @@ def create_app(
 ) -> FastAPI:
     settings = settings or ApiSettings.from_env()
     build = model_factory or build_model
+    tracer_provider = configure("opspilot-agent-api")
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -96,6 +98,7 @@ def create_app(
                     settings,
                     model_factory=build,
                     toolset_factory=toolset_factory,
+                    tracer_provider=tracer_provider,
                 )
                 await service.recover()
                 app.state.service, app.state.chaos = service, chaos

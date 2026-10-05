@@ -19,12 +19,14 @@ import logging
 from collections import defaultdict
 from collections.abc import Callable, Coroutine
 from contextlib import AbstractAsyncContextManager
+from pathlib import Path
 from typing import Any
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.types import Command
+from opentelemetry import trace
 
 from opspilot_agent.graph import AgentConfig, build_graph
 from opspilot_agent.llm import ModelSpecError, build_model
@@ -45,8 +47,18 @@ from opspilot_api.schemas import (
 from opspilot_api.settings import ApiSettings
 from opspilot_api.store import InvestigationStore, utcnow
 from opspilot_api.trace import events_from_update
+from opspilot_evals.scoring import Pricing, load_pricing
+from opspilot_observability.tracing import context_from_traceparent, traceparent_of
 
 log = logging.getLogger(__name__)
+
+
+def _load_pricing(path: Path) -> dict[str, Pricing]:
+    if not path.is_file():
+        log.warning("Pricing file %s not found; investigation cost is reported as unknown", path)
+        return {}
+    return load_pricing(path)
+
 
 ModelFactory = Callable[[str], BaseChatModel]
 ToolsetFactory = Callable[[], AbstractAsyncContextManager[ToolSet]]
@@ -72,6 +84,7 @@ class InvestigationService:
         *,
         model_factory: ModelFactory | None = None,
         toolset_factory: ToolsetFactory | None = None,
+        tracer_provider: trace.TracerProvider | None = None,
     ) -> None:
         self.store = store
         self.settings = settings
@@ -79,9 +92,17 @@ class InvestigationService:
         self._model_factory = model_factory or build_model
         self._toolset_factory = toolset_factory or self._mcp_toolset
         self._config = AgentConfig(max_turns=settings.max_turns)
+        self._tracer_provider = tracer_provider or trace.get_tracer_provider()
+        self._tracer = self._tracer_provider.get_tracer("opspilot.api")
+        self._pricing = _load_pricing(settings.pricing_file)
         # Same graph structure without a model or tools: reads checkpoints, applies rejections.
         self._toolless = build_graph(
-            inert_model(), [], {}, config=self._config, checkpointer=checkpointer
+            inert_model(),
+            [],
+            {},
+            config=self._config,
+            checkpointer=checkpointer,
+            tracer_provider=self._tracer_provider,
         )
         self._slots = asyncio.Semaphore(settings.max_concurrent)
         self._locks: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
@@ -94,8 +115,37 @@ class InvestigationService:
 
     def _graph(self, model: BaseChatModel, tools: ToolSet) -> Any:
         return build_graph(
-            model, tools.read, tools.write, config=self._config, checkpointer=self._checkpointer
+            model,
+            tools.read,
+            tools.write,
+            config=self._config,
+            checkpointer=self._checkpointer,
+            tracer_provider=self._tracer_provider,
         )
+
+    def _cost(self, model: str, usage_tokens: tuple[int, int]) -> float | None:
+        pricing = self._pricing.get(model)
+        return pricing.cost(*usage_tokens) if pricing else None
+
+    def _record_approval_wait(self, record: InvestigationRecord) -> None:
+        """A span covering the wait at the approval gate, from the first time it was requested
+        to the decision just made. Built from persisted timestamps (not a span object kept open
+        across the wait), so it is correct even when the decision arrives after an API restart.
+        """
+        if record.approval is None or record.approval_requested_at is None:
+            return
+        start_ns = int(record.approval_requested_at.timestamp() * 1_000_000_000)
+        end_ns = int(record.approval.decided_at.timestamp() * 1_000_000_000)
+        span = self._tracer.start_span(
+            "approval_wait",
+            context=context_from_traceparent(record.trace_parent),
+            start_time=start_ns,
+            attributes={
+                "opspilot.approval.approved": record.approval.approved,
+                "opspilot.approval.reviewer": record.approval.reviewer,
+            },
+        )
+        span.end(end_time=end_ns)
 
     @staticmethod
     def _thread(investigation_id: str) -> dict[str, Any]:
@@ -162,6 +212,7 @@ class InvestigationService:
             )
             if approved:
                 record.status = "executing"
+            self._record_approval_wait(record)
             await self._save(record)
             await self._event(
                 investigation_id,
@@ -217,45 +268,64 @@ class InvestigationService:
         async with self._slots:
             record = await self.get(investigation_id)
             record.status, record.started_at = "running", utcnow()
-            await self._save(record)
             alert = record.alert
             text = alert_message(
                 alert.title, alert.service, alert.details, started_minutes_ago=alert.firing_minutes
             )
             error = None
-            try:
-                async with self._toolset_factory() as tools:
-                    await self._stream(
-                        investigation_id,
-                        self._graph(model, tools),
-                        {"messages": [HumanMessage(text)]},
-                    )
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:  # the run fails, the API keeps serving
-                log.exception("Investigation %s failed", investigation_id)
-                error = _error_text(exc)
+            with self._tracer.start_as_current_span(
+                "investigation",
+                attributes={
+                    "opspilot.investigation_id": investigation_id,
+                    "opspilot.alert.title": alert.title,
+                    "opspilot.model": record.model,
+                },
+            ):
+                # Persisted before the (possibly long) stream runs, so a crash mid-run still
+                # leaves enough to record the approval wait in the right trace later.
+                record.trace_parent = traceparent_of()
+                await self._save(record)
+                try:
+                    async with self._toolset_factory() as tools:
+                        await self._stream(
+                            investigation_id,
+                            self._graph(model, tools),
+                            {"messages": [HumanMessage(text)]},
+                        )
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:  # the run fails, the API keeps serving
+                    log.exception("Investigation %s failed", investigation_id)
+                    error = _error_text(exc)
             await self._settle(investigation_id, error)
 
     async def _execute(self, investigation_id: str, resume: Command) -> None:
         error = None
-        try:
-            async with self._toolset_factory() as tools:
-                await self._stream(investigation_id, self._graph(inert_model(), tools), resume)
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            log.exception("Approved action of %s failed", investigation_id)
-            error = _error_text(exc)
+        record = await self.get(investigation_id)
+        with self._tracer.start_as_current_span(
+            "investigation.resume", context=context_from_traceparent(record.trace_parent)
+        ):
+            try:
+                async with self._toolset_factory() as tools:
+                    await self._stream(investigation_id, self._graph(inert_model(), tools), resume)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                log.exception("Approved action of %s failed", investigation_id)
+                error = _error_text(exc)
         await self._settle(investigation_id, error)
 
     async def _reject(self, investigation_id: str, resume: Command) -> None:
         error = None
-        try:
-            await self._stream(investigation_id, self._toolless, resume)
-        except Exception as exc:
-            log.exception("Rejecting %s failed", investigation_id)
-            error = _error_text(exc)
+        record = await self.get(investigation_id)
+        with self._tracer.start_as_current_span(
+            "investigation.resume", context=context_from_traceparent(record.trace_parent)
+        ):
+            try:
+                await self._stream(investigation_id, self._toolless, resume)
+            except Exception as exc:
+                log.exception("Rejecting %s failed", investigation_id)
+                error = _error_text(exc)
         await self._settle(investigation_id, error)
 
     async def _stream(self, investigation_id: str, graph: Any, payload: Any) -> None:
@@ -280,6 +350,9 @@ class InvestigationService:
             record.diagnosis, record.diagnosed_at = values["diagnosis"], utcnow()
         elif node == "execute_action":
             record.action_result = values.get("action_result")
+        record.usage.cost_usd = self._cost(
+            record.model, (record.usage.input_tokens, record.usage.output_tokens)
+        )
         for kind, data in events_from_update(node, values):
             await self.store.add_event(investigation_id, kind, data)
         await self._save(record)
@@ -306,6 +379,7 @@ class InvestigationService:
                 )
             if record.approval_request != request:
                 record.approval_request = request
+                record.approval_requested_at = utcnow()
                 await self._event(investigation_id, "approval_requested", request)
             record.status = "awaiting_approval"
         elif not snapshot.next and (outcome := snapshot.values.get("outcome")):
