@@ -21,6 +21,7 @@ from opspilot_evals.report import write_report
 from opspilot_evals.runner import default_out_dir, run_benchmark
 from opspilot_evals.scenario import load_scenarios
 from opspilot_evals.scoring import load_pricing
+from opspilot_observability.tracing import configure
 
 EVALS_DIR = Path(__file__).resolve().parent.parent
 
@@ -95,6 +96,7 @@ def main(argv: list[str] | None = None) -> None:
         level=logging.INFO if args.verbose else logging.WARNING,
         format="%(asctime)s %(levelname)s %(message)s",
     )
+    configure("opspilot-eval")
     sys.exit(asyncio.run(_main(args)))
 
 

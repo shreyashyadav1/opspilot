@@ -314,5 +314,9 @@ class PlaybookChatModel(_FakeBase):
                 {"name": name, "args": args, "id": f"call_{turn}_{i}", "type": "tool_call"}
                 for i, (name, args) in enumerate(calls)
             ],
+            # Not estimated like ScriptedChatModel's test double: this is the baseline actually
+            # reported by the API and the benchmark, and it makes no model calls, so the honest
+            # number is zero, not a guess dressed up as a token count.
+            usage_metadata={"input_tokens": 0, "output_tokens": 0, "total_tokens": 0},
         )
-        return ChatResult(generations=[ChatGeneration(message=_with_usage(message, messages))])
+        return ChatResult(generations=[ChatGeneration(message=message)])
