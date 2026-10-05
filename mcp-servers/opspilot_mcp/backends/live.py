@@ -16,6 +16,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
+from opentelemetry import trace
+from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 
 from opspilot_mcp.catalog import CATALOG
 from opspilot_mcp.logsearch import parse_line
@@ -78,9 +80,18 @@ class LiveBackend:
         self,
         settings: LiveSettings | None = None,
         client: httpx.AsyncClient | None = None,
+        tracer_provider: trace.TracerProvider | None = None,
     ) -> None:
         self.settings = settings or LiveSettings.from_env()
-        self._client = client or httpx.AsyncClient(timeout=10.0)
+        if client is not None:
+            self._client = client
+        else:
+            self._client = httpx.AsyncClient(timeout=10.0)
+            # So a rollback (and, on services that do not exclude it, a health check) continues
+            # the investigation's trace into the demo system, instead of starting a new one.
+            HTTPXClientInstrumentor.instrument_client(
+                self._client, tracer_provider=tracer_provider or trace.get_tracer_provider()
+            )
 
     async def aclose(self) -> None:
         await self._client.aclose()
