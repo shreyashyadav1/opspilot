@@ -112,7 +112,10 @@ def build_graph(
 
     tracer = (tracer_provider or trace.get_tracer_provider()).get_tracer("opspilot.agent")
     model_name = (
-        getattr(model, "model_name", None) or getattr(model, "model", None) or type(model).__name__
+        getattr(model, "model_name", None)
+        or getattr(model, "model", None)
+        or getattr(model, "_llm_type", None)  # "scripted", "playbook" for the test/baseline fakes
+        or type(model).__name__
     )
 
     def node_span(name: str, **attributes: Any) -> Any:
