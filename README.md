@@ -125,6 +125,25 @@ make ui-dev      # dashboard on :8100, proxies /api to :8180
 make api-test ui-test ui-e2e   # pytest; lint, types, Vitest; Playwright smoke tests (Chrome)
 ```
 
+## Tracing
+
+Every investigation is one OpenTelemetry trace: a span per graph node, per model call (model,
+tokens, latency) and per MCP tool call (name, arguments, result size, latency), plus the
+approval wait. A tool call that reaches the demo system (a deploy-history read, a rollback)
+carries that trace into it, so it shows up in the same trace where the services' own
+instrumentation allows it.
+
+Tracing is off until you turn it on:
+
+```bash
+echo "OPSPILOT_TRACING_ENABLED=true" >> .env
+make dashboard-up        # or: make up-tracing, for the demo system plus Jaeger without the API
+open http://localhost:8166    # Jaeger UI; search for a service such as opspilot-agent-api
+```
+
+With tracing off (the default), every service still creates spans locally but none are
+exported, so nothing here needs a trace backend running: unit tests and CI are unaffected.
+
 ## How the benchmark works
 
 Each scenario in [`evals/scenarios/`](evals/scenarios) names a fault, the alert it triggers,
@@ -194,7 +213,9 @@ the model, date, commit and number of repetitions.
 - [ ] M4 Benchmark: harness, scenarios and CI run are done; first real LLM run pending
 - [x] M5 Operator dashboard (Next.js + TypeScript) on a FastAPI agent API: incidents, reasoning
   trace, approve and reject, benchmark browser
-- [ ] M6 Agent observability: Langfuse or OpenTelemetry traces of every model and tool call
+- [x] M6 Agent observability: an OpenTelemetry trace per investigation (model and tool calls,
+  the approval wait), propagated into the demo system, a Jaeger backend in docker compose, and
+  cost per incident in the API, the dashboard and the benchmark
 - [ ] M7 Kubernetes (kind + Helm), Loki log backend, cloud deployment
 
 See the milestone details in [docs/DESIGN.md](docs/DESIGN.md#7-milestones).
@@ -208,6 +229,7 @@ ui/                        dashboard (Next.js): pages, components, Vitest and Pl
 mcp-servers/opspilot_mcp/  MCP server, metric catalog, log search, live and simulated backends
 evals/                     scenarios, pricing, runner, scorer, reports
 demo-system/               docker compose, Python services, Spring Boot orders, Prometheus
+observability/             shared OpenTelemetry setup used by the agent, the API and the MCP server
 tests/                     unit tests; tests/integration runs only when the stack is up
 docs/DESIGN.md             design and evaluation methodology
 ```
