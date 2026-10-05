@@ -58,13 +58,13 @@ def test_missing_api_key_is_a_clear_error(monkeypatch):
     monkeypatch.setattr("opspilot_agent.llm.factory.load_dotenv", lambda: None)
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
     with pytest.raises(ModelSpecError, match="GROQ_API_KEY is not set"):
-        build_model("groq:llama-3.3-70b-versatile")
+        build_model("groq:openai/gpt-oss-120b")
 
 
 def test_groq_model_is_openai_compatible(monkeypatch):
     monkeypatch.setenv("GROQ_API_KEY", "test-key-not-real")
-    model = build_model("groq:llama-3.3-70b-versatile")
-    assert model.model_name == "llama-3.3-70b-versatile"
+    model = build_model("groq:openai/gpt-oss-120b")
+    assert model.model_name == "openai/gpt-oss-120b"
     assert "groq.com" in str(model.openai_api_base)
     assert "test-key" not in repr(model)
 

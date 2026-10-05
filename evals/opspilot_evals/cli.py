@@ -1,7 +1,7 @@
 """Benchmark CLI.
 
 opspilot-eval --env simulated --model fake:playbook          # deterministic, used in CI
-opspilot-eval --env live --model groq:llama-3.3-70b-versatile  # needs the stack and a key
+opspilot-eval --env live --model groq:openai/gpt-oss-120b      # needs the stack and a key
 """
 
 from __future__ import annotations

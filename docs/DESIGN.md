@@ -247,8 +247,9 @@ Only `rollback_deploy` is executable today. The other action types are recommend
 the operator carries out.
 
 **Models.** Any OpenAI-compatible chat endpoint through `langchain-openai`. The default is Groq
-`llama-3.3-70b-versatile` with the key read from `GROQ_API_KEY` in `.env`. Two deterministic
-fakes implement the same LangChain chat-model interface:
+`openai/gpt-oss-120b` (a reasoning model; its reasoning tokens count against `max_tokens`, set
+generously for that) with the key read from `GROQ_API_KEY` in `.env`. Two deterministic fakes
+implement the same LangChain chat-model interface:
 
 - `ScriptedChatModel` replays a fixed list of responses. Unit tests use it to drive every branch
   of the graph.

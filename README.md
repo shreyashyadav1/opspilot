@@ -8,7 +8,7 @@ anything. A fault-injection benchmark with known root causes scores the agent on
 accuracy, tool-call precision, steps, time to diagnosis and token cost per incident.
 
 The agent is a LangGraph state machine on top of any OpenAI-compatible model (Groq
-`llama-3.3-70b-versatile` by default). The system under investigation is a Docker Compose
+`openai/gpt-oss-120b` by default). The system under investigation is a Docker Compose
 stack: FastAPI and Spring Boot services, Postgres, Prometheus, a load generator, and a control
 plane that injects faults and records their ground truth. An operator dashboard (Next.js, on a
 FastAPI agent API) shows each investigation as it happens and is where a person approves or
@@ -113,7 +113,7 @@ open http://localhost:8100
 
 Without an API key the agent API uses the rule-based playbook (`fake:playbook`), which the
 dashboard labels as a baseline, not an LLM. With `GROQ_API_KEY` in `.env`, it uses
-`llama-3.3-70b-versatile` and still offers the playbook for comparison. Investigations and
+`openai/gpt-oss-120b` and still offers the playbook for comparison. Investigations and
 pending approvals survive restarts of the API; `make down` removes them with the other volumes.
 
 For development, run the API and the dashboard on the host against `make up`:
@@ -164,8 +164,8 @@ Two environments share the same runner:
 
 ```bash
 make up
-make eval MODEL=groq:llama-3.3-70b-versatile   # needs GROQ_API_KEY in .env
-.venv/bin/opspilot-eval --env live --model groq:llama-3.3-70b-versatile --repeats 3
+make eval MODEL=groq:openai/gpt-oss-120b   # needs GROQ_API_KEY in .env
+.venv/bin/opspilot-eval --env live --model groq:openai/gpt-oss-120b --repeats 3
 ```
 
 ## Results

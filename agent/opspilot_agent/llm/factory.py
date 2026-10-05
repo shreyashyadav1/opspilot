@@ -1,4 +1,4 @@
-"""Build a chat model from a spec such as `groq:llama-3.3-70b-versatile` or `fake:playbook`.
+"""Build a chat model from a spec such as `groq:openai/gpt-oss-120b` or `fake:playbook`.
 
 Real providers go through `langchain-openai` against any OpenAI-compatible endpoint. Keys are
 read from the environment (and `.env`); they are never logged or passed to tool servers.
@@ -13,7 +13,14 @@ from dotenv import load_dotenv
 from langchain_core.language_models import BaseChatModel
 from pydantic import SecretStr
 
-DEFAULT_MODEL = "groq:llama-3.3-70b-versatile"
+# Groq retired llama-3.3-70b-versatile on 2026-08-16; gpt-oss-120b is its recommended
+# replacement (https://console.groq.com/docs/deprecations).
+DEFAULT_MODEL = "groq:openai/gpt-oss-120b"
+# gpt-oss-120b is a reasoning model: its reasoning tokens are billed and counted against
+# max_tokens just like the visible answer, so a request can be cut off before it ever reaches
+# the tool call or submit_diagnosis if the budget is too tight. 8192 leaves real headroom
+# without approaching the model's 65536-token ceiling.
+DEFAULT_MAX_TOKENS = 8192
 
 
 class ModelSpecError(ValueError):
@@ -71,6 +78,7 @@ def build_model(spec: str | None = None, *, temperature: float = 0.0) -> BaseCha
         base_url=base_url,
         api_key=SecretStr(api_key),
         temperature=temperature,
+        max_tokens=DEFAULT_MAX_TOKENS,
         max_retries=6,
         timeout=90,
     )

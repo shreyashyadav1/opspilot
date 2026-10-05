@@ -2,7 +2,7 @@ PYTHON ?= python3.13
 VENV := .venv
 BIN := $(VENV)/bin
 COMPOSE := docker compose -f demo-system/docker-compose.yml
-MODEL ?= groq:llama-3.3-70b-versatile
+MODEL ?= groq:openai/gpt-oss-120b
 
 .DEFAULT_GOAL := help
 .PHONY: help install up up-tracing down ps logs test lint format eval-fake eval eval-baseline \

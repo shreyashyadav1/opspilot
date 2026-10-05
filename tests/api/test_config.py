@@ -24,13 +24,13 @@ async def test_config_labels_the_playbook_as_a_baseline(settings):
 async def test_a_model_without_its_key_is_reported_not_run(settings, monkeypatch):
     monkeypatch.setattr("opspilot_agent.llm.factory.load_dotenv", lambda: None)
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
-    settings = replace(settings, model="groq:llama-3.3-70b-versatile")
+    settings = replace(settings, model="groq:openai/gpt-oss-120b")
     async with serve(create_app(settings, toolset_factory=FakeTools().session)) as client:
         config = (await client.get("/config")).json()
         assert config["model"]["kind"] == "llm"
         assert "GROQ_API_KEY is not set" in config["model_error"]
         assert [m["spec"] for m in config["models"]] == [
-            "groq:llama-3.3-70b-versatile",
+            "groq:openai/gpt-oss-120b",
             BASELINE_MODEL,
         ]
         refused = await client.post("/investigations", json={"alert": "Checkout errors"})
@@ -46,6 +46,6 @@ def test_default_model_prefers_explicit_config_then_a_groq_key(monkeypatch):
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
     assert default_model() == "fake:playbook"
     monkeypatch.setenv("GROQ_API_KEY", "test-key-not-real")
-    assert default_model() == "groq:llama-3.3-70b-versatile"
+    assert default_model() == "groq:openai/gpt-oss-120b"
     monkeypatch.setenv("OPSPILOT_MODEL", "openai:gpt-4o-mini")
     assert default_model() == "openai:gpt-4o-mini"

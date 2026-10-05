@@ -18,9 +18,9 @@ export const PLAYBOOK = {
 };
 
 export const LLM = {
-  spec: "groq:llama-3.3-70b-versatile",
+  spec: "groq:openai/gpt-oss-120b",
   kind: "llm" as const,
-  label: "llama-3.3-70b-versatile",
+  label: "openai/gpt-oss-120b",
   description: "LLM served by Groq.",
 };
 
