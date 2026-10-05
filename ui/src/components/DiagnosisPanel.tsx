@@ -1,6 +1,6 @@
 import { LoaderCircle } from "lucide-react";
 
-import { actionLabel, categoryLabel, percent } from "@/lib/format";
+import { actionLabel, categoryLabel, money, percent } from "@/lib/format";
 import type { InvestigationDetail } from "@/lib/types";
 
 import { Notice } from "./ui";
@@ -12,6 +12,21 @@ const SOURCE: Record<string, string> = {
   deploys: "Deploys",
   health: "Health",
 };
+
+/** The cost figure, with a note when it is zero because the model is a non-LLM baseline rather
+ * than because nothing was tracked. */
+function CostNote({ investigation }: { investigation: InvestigationDetail }) {
+  const { usage, model } = investigation;
+  if (usage.cost_usd !== null && usage.cost_usd !== undefined && model.kind === "baseline") {
+    return (
+      <>
+        {money(usage.cost_usd)}{" "}
+        <span className={styles.note}>(rule-based baseline, no LLM calls)</span>
+      </>
+    );
+  }
+  return <>{money(usage.cost_usd)}</>;
+}
 
 export function DiagnosisPanel({ investigation }: { investigation: InvestigationDetail }) {
   const { diagnosis, status, usage } = investigation;
@@ -35,6 +50,10 @@ export function DiagnosisPanel({ investigation }: { investigation: Investigation
             <div>
               <dt>Tool calls</dt>
               <dd className="numeric">{usage.tool_calls}</dd>
+            </div>
+            <div>
+              <dt>Cost so far</dt>
+              <dd className="numeric">{money(usage.cost_usd)}</dd>
             </div>
           </dl>
         </section>
@@ -111,7 +130,7 @@ export function DiagnosisPanel({ investigation }: { investigation: Investigation
       {investigation.time_to_diagnosis_s !== null ? (
         <p className={`${styles.stats} numeric`}>
           Diagnosed in {investigation.time_to_diagnosis_s.toFixed(1)} s with {usage.turns} model
-          turns and {usage.tool_calls} tool calls.
+          turns and {usage.tool_calls} tool calls. Cost: <CostNote investigation={investigation} />
         </p>
       ) : null}
     </section>

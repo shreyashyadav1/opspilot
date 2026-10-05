@@ -145,7 +145,15 @@ export function investigation(overrides: Partial<InvestigationDetail> = {}): Inv
     approval_request: REQUEST,
     approval: null,
     action_result: null,
-    usage: { turns: 2, model_calls: 2, tool_calls: 2, input_tokens: 900, output_tokens: 120 },
+    usage: {
+      turns: 2,
+      model_calls: 2,
+      tool_calls: 2,
+      input_tokens: 900,
+      output_tokens: 120,
+      // Matches the default fixture model, PLAYBOOK: a real, priced zero (see evals/pricing.yaml).
+      cost_usd: 0.0,
+    },
     time_to_diagnosis_s: 1,
     error: null,
     trace: pendingTrace(),

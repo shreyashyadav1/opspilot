@@ -72,6 +72,12 @@ export function number(value: number | null | undefined, digits = 1): string {
   return value.toFixed(digits);
 }
 
+/** A cost in USD, with enough precision to show sub-cent amounts; "n/a" when unpriced. */
+export function money(value: number | null | undefined): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return "n/a";
+  return `$${value.toFixed(value > 0 && value < 0.01 ? 4 : 2)}`;
+}
+
 export function clockTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, {
     hour: "2-digit",

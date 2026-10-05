@@ -111,6 +111,9 @@ export interface Usage {
   tool_calls: number;
   input_tokens: number;
   output_tokens: number;
+  // null when the model in use has no entry in the price table; 0 is a real, priced zero (the
+  // fake:playbook baseline makes no model calls).
+  cost_usd: number | null;
 }
 
 export interface ToolCallData {
