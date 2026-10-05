@@ -166,6 +166,7 @@ services:
       OPSPILOT_API_PORT: "8080"
       OPSPILOT_API_DATA_DIR: /data
       OPSPILOT_RESULTS_DIR: /app/evals/results
+      OPSPILOT_PRICING_FILE: /app/evals/pricing.yaml
       OPSPILOT_BACKEND: live
       OPSPILOT_CHAOS_URL: http://control-plane:8080
       OPSPILOT_PROMETHEUS_URL: http://prometheus:9090

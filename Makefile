@@ -1,7 +1,14 @@
 PYTHON ?= python3.13
 VENV := .venv
 BIN := $(VENV)/bin
-COMPOSE := docker compose -f demo-system/docker-compose.yml
+# --env-file points ${VAR} substitution (OPSPILOT_TRACING_ENABLED and friends) at the
+# repository's own .env, only when one exists: compose's own default .env lookup is relative
+# to the compose file's directory (demo-system/), not the repository root, even when invoked
+# from here, and --env-file errors outright if the path it names does not exist.
+# --project-directory would fix the substitution too, but it also changes how the compose
+# file's *relative volume paths* resolve, which assume demo-system/.
+ENV_FILE := $(wildcard .env)
+COMPOSE := docker compose $(if $(ENV_FILE),--env-file ./.env) -f demo-system/docker-compose.yml
 MODEL ?= groq:openai/gpt-oss-120b
 
 .DEFAULT_GOAL := help
