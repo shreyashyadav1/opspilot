@@ -15,6 +15,8 @@ from langchain_mcp_adapters.sessions import StdioConnection
 from langchain_mcp_adapters.tools import load_mcp_tools
 from mcp.client.stdio import get_default_environment
 
+from opspilot_observability.tracing import subprocess_env
+
 SERVER_NAME = "opspilot"
 # Only settings the tool server needs. Model API keys never reach it.
 _PASSTHROUGH_PREFIXES = (
@@ -33,6 +35,10 @@ def stdio_connection(backend: str = "live", simulation: Path | None = None) -> S
         args += ["--simulation", str(simulation)]
     env = get_default_environment()
     env.update({k: v for k, v in os.environ.items() if k.startswith(_PASSTHROUGH_PREFIXES)})
+    # Carries the current span's trace context to the server subprocess, if there is one (empty
+    # when tracing is disabled or this is called outside an investigation's span), so its own
+    # tool-call spans land in the same trace as the investigation that spawned it.
+    env.update(subprocess_env())
     return {"transport": "stdio", "command": sys.executable, "args": args, "env": env}
 
 
