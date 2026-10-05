@@ -47,6 +47,13 @@
             <artifactId>micrometer-tracing-bridge-otel</artifactId>
         </dependency>
         <dependency>
+            <!-- Lets Spring Boot auto-configure OTLP/HTTP trace export (management.otlp.tracing.*)
+                 without a Java agent: lighter than attaching one, and this is the only service
+                 here on the JVM, so Micrometer Tracing is enough. -->
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-otlp</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>

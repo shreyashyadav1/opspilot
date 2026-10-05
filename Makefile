@@ -5,8 +5,8 @@ COMPOSE := docker compose -f demo-system/docker-compose.yml
 MODEL ?= groq:llama-3.3-70b-versatile
 
 .DEFAULT_GOAL := help
-.PHONY: help install up down ps logs test lint format eval-fake eval eval-baseline lock clean \
-	dashboard-up api-dev api-test ui-install ui-dev ui-test ui-e2e
+.PHONY: help install up up-tracing down ps logs test lint format eval-fake eval eval-baseline \
+	lock lock-runtime clean dashboard-up api-dev api-test ui-install ui-dev ui-test ui-e2e
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-14s %s\n", $$1, $$2}'
@@ -23,7 +23,10 @@ install: $(BIN)/opspilot ## Create .venv and install the pinned dependencies
 up: ## Build and start the demo system (docker compose)
 	$(COMPOSE) up -d --build
 
-dashboard-up: ## Demo system plus the agent API (:8180) and the dashboard (:8100), in docker
+up-tracing: ## Demo system plus Jaeger (:8166); set OPSPILOT_TRACING_ENABLED=true in .env first
+	$(COMPOSE) --profile tracing up -d --build
+
+dashboard-up: ## Demo system, the agent API (:8180), the dashboard (:8100) and Jaeger (:8166)
 	$(COMPOSE) --profile dashboard up -d --build
 
 down: ## Stop the demo system (and the dashboard, if running) and remove their volumes
@@ -84,6 +87,16 @@ ui-e2e: ui/node_modules ## Dashboard production build and Playwright smoke tests
 lock: ## Re-pin the full development environment into requirements.lock
 	@echo "# Fully pinned development environment (Python 3.13). Regenerate with: make lock" > requirements.lock
 	$(BIN)/python -m pip freeze --exclude-editable | grep -viE '^(hatchling|trove-classifiers|pathspec)==' >> requirements.lock
+
+lock-runtime: ## Re-pin requirements-runtime.lock (no pytest/ruff): used by the agent API image
+	rm -rf .venv-runtime
+	$(PYTHON) -m venv .venv-runtime
+	.venv-runtime/bin/python -m pip install --quiet --upgrade pip
+	.venv-runtime/bin/python -m pip install --quiet .
+	@echo "# Runtime-only dependencies of the agent API image (Python 3.13)." > requirements-runtime.lock
+	@echo "# Regenerate with: make lock-runtime" >> requirements-runtime.lock
+	.venv-runtime/bin/python -m pip freeze | grep -viE '^opspilot(==|\s)' >> requirements-runtime.lock
+	rm -rf .venv-runtime
 
 clean: ## Remove caches and local eval results
 	rm -rf .pytest_cache .ruff_cache ui/.next ui/test-results ui/playwright-report

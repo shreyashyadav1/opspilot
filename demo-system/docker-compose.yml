@@ -3,10 +3,18 @@
 #
 # The "dashboard" profile adds the agent API and the operator dashboard:
 #   docker compose -f demo-system/docker-compose.yml --profile dashboard up -d --build
+# The "tracing" profile adds a Jaeger all-in-one trace backend (also included with "dashboard").
+# Tracing itself stays off until OPSPILOT_TRACING_ENABLED=true is set (in the repository's .env
+# or the shell): every service still starts and passes its tests without it.
 #
 # Host ports: 8101 storefront, 8102 orders, 8103 payments, 8190 control-plane,
-#             9095 prometheus, 5440 postgres; dashboard profile: 8100 dashboard, 8180 agent API.
+#             9095 prometheus, 5440 postgres; dashboard profile: 8100 dashboard, 8180 agent API;
+#             tracing profile: 8166 Jaeger UI.
 name: opspilot
+
+x-tracing-env: &tracing-env
+  OPSPILOT_TRACING_ENABLED: ${OPSPILOT_TRACING_ENABLED:-false}
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
 
 x-python-service: &python-service
   image: opspilot-python-services:dev
@@ -52,6 +60,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
+      <<: *tracing-env
       DB_URL: jdbc:postgresql://postgres:5432/orders
       DB_USER: orders
       DB_PASSWORD: ${ORDERS_DB_PASSWORD:-orders-local-dev}
@@ -65,7 +74,7 @@ services:
     container_name: opspilot-payments
     command: ["uvicorn", "opsdemo.payments.app:app", "--host", "0.0.0.0", "--port", "8080", "--no-access-log", "--timeout-graceful-shutdown", "5"]
     environment:
-      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      <<: *tracing-env
     ports:
       - "8103:8080"
 
@@ -74,8 +83,8 @@ services:
     container_name: opspilot-storefront
     command: ["uvicorn", "opsdemo.storefront.app:app", "--host", "0.0.0.0", "--port", "8080", "--no-access-log", "--timeout-graceful-shutdown", "5"]
     environment:
+      <<: *tracing-env
       ORDERS_URL: http://orders:8080
-      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
     ports:
       - "8101:8080"
 
@@ -84,6 +93,7 @@ services:
     container_name: opspilot-control-plane
     command: ["uvicorn", "opsdemo.control_plane.app:app", "--host", "0.0.0.0", "--port", "8080", "--no-access-log", "--timeout-graceful-shutdown", "5"]
     environment:
+      <<: *tracing-env
       CP_SERVICE_URLS: storefront=http://storefront:8080,orders=http://orders:8080,payments=http://payments:8080
     ports:
       - "8190:8080"
@@ -113,6 +123,23 @@ services:
       - "9095:9090"
     mem_limit: 256m
 
+  # -- tracing profile (also included with "dashboard") ----------------------------------------
+  # Jaeger all-in-one: in-memory storage, no separate collector/database. Receives OTLP/HTTP on
+  # :4318 and serves its UI and query API on :16686. Every other service points at it with
+  # OTEL_EXPORTER_OTLP_ENDPOINT but only actually sends spans once OPSPILOT_TRACING_ENABLED=true.
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.65.0
+    container_name: opspilot-jaeger
+    restart: unless-stopped
+    profiles: [dashboard, tracing]
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "8166:16686"
+      - "4318:4318"
+    mem_limit: 200m
+
   # -- dashboard profile ----------------------------------------------------------------------
 
   agent-api:
@@ -134,6 +161,7 @@ services:
         required: false
     # Container-specific settings; these take precedence over the same names in .env.
     environment:
+      <<: *tracing-env
       OPSPILOT_API_HOST: 0.0.0.0
       OPSPILOT_API_PORT: "8080"
       OPSPILOT_API_DATA_DIR: /data
