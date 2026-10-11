@@ -140,7 +140,8 @@ export function InvestigationView({ investigationId }: { investigationId: string
           </div>
         )}
         <div className={styles.trail}>
-          <Timeline investigation={data} />
+          {/* Keyed so a different investigation starts with no "new" steps. */}
+          <Timeline key={data.id} investigation={data} />
         </div>
       </div>
     </div>
