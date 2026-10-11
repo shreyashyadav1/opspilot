@@ -1,0 +1,231 @@
+.change {
+  --path: var(--intent);
+  --target: var(--intent);
+  --dot: 12px;
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* The version line: older on the left, the running version on the right. */
+.track {
+  display: grid;
+  grid-template-columns: auto minmax(var(--space-6), 1fr) auto;
+  grid-template-areas:
+    "to . from"
+    "rail rail rail"
+    "to-caption citation from-caption";
+  align-items: end;
+  column-gap: var(--space-3);
+}
+
+/* The version the agent wants to reach carries its intent; the running one stays plain ink. */
+.version {
+  grid-area: to;
+  font-family: var(--font-code);
+  font-size: var(--text-version);
+  font-weight: 650;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--target);
+  transition: color var(--dur-state) ease;
+}
+
+.version.from {
+  grid-area: from;
+  text-align: right;
+  color: var(--ink);
+}
+
+.unknown {
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.rail {
+  grid-area: rail;
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 20px;
+  margin-top: var(--space-2);
+  /* The mover is as wide as the rail and slides within it; nothing may spill past the ends. */
+  overflow: hidden;
+}
+
+.head {
+  flex: none;
+  fill: var(--path);
+  transition:
+    fill var(--dur-state) ease,
+    opacity var(--dur-state) ease;
+}
+
+.line {
+  flex: 1;
+  height: 0;
+  border-top: 2px solid var(--path);
+  transition: border-color var(--dur-state) ease;
+}
+
+/* The running version, as a dot that travels to the left end when the rollback lands. */
+.mover {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 100%;
+  height: 0;
+  transform: translateX(calc(100% - var(--dot)));
+}
+
+.dot {
+  position: absolute;
+  left: 0;
+  top: calc(var(--dot) / -2);
+  width: var(--dot);
+  height: var(--dot);
+  border-radius: 50%;
+  background: var(--ink);
+  box-shadow: 0 0 0 3px var(--panel);
+  transition: background-color var(--dur-state) ease;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mover {
+    transition: transform var(--dur-move) var(--ease-in-out);
+  }
+}
+
+.pathLabel {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 0 var(--space-2);
+  background: var(--panel);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--path);
+  white-space: nowrap;
+}
+
+.caption {
+  grid-area: to-caption;
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.caption.from {
+  grid-area: from-caption;
+  text-align: right;
+}
+
+/* Where the versions come from, under the middle of the line. */
+.citation {
+  grid-area: citation;
+  justify-self: center;
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.citation a {
+  color: var(--ink-2);
+}
+
+/* States */
+.executed {
+  --path: var(--healthy);
+  --target: var(--healthy);
+}
+
+.executed .mover {
+  transform: translateX(0);
+}
+
+.executed .dot {
+  background: var(--healthy);
+}
+
+.executed .head {
+  opacity: 0;
+}
+
+.executed .version.from {
+  color: var(--ink-3);
+}
+
+.rejected {
+  --path: var(--ink-3);
+  --target: var(--ink-3);
+}
+
+.failed {
+  --path: var(--failing);
+  --target: var(--ink-3);
+}
+
+.rejected .line,
+.failed .line {
+  border-top-style: dashed;
+}
+
+/* What the rollback undoes */
+.undoes {
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+
+.summary {
+  color: var(--ink);
+}
+
+.config {
+  margin: 0;
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--sunk);
+  border-radius: var(--radius-m);
+}
+
+.configRow {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 2px var(--space-3);
+  align-items: baseline;
+}
+
+.configRow dt {
+  grid-column: 1 / -1;
+  font-size: var(--text-xs);
+  color: var(--ink-2);
+}
+
+.configRow dd {
+  display: contents;
+}
+
+.configLabel {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.configValue {
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+.configValue.after {
+  color: var(--ink);
+}
+
+.source {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
