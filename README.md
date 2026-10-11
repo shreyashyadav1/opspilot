@@ -141,8 +141,22 @@ make dashboard-up        # or: make up-tracing, for the demo system plus Jaeger 
 open http://localhost:8166    # Jaeger UI; search for a service such as opspilot-agent-api
 ```
 
+Each investigation page shows its trace id; paste it into Jaeger's "Lookup by Trace ID" box to
+open that run. The trace has one root `investigation` span, a `graph.*` span per node with
+`llm.chat` and `mcp.tool/<name>` spans beneath, the `approval_wait`, and, when the run is
+resumed after a decision, the resumed run's spans in the same trace.
+
 With tracing off (the default), every service still creates spans locally but none are
 exported, so nothing here needs a trace backend running: unit tests and CI are unaffected.
+
+## Cost per incident
+
+Token usage is recorded per investigation and priced from [`evals/pricing.yaml`](evals/pricing.yaml)
+(USD per million input and output tokens, with the source of each price cited in the file). The
+estimate appears next to the turns and tool calls on the investigation page, as `usage.cost_usd`
+in the agent API response, and in the benchmark summary. A model missing from the price table is
+reported with an unknown cost rather than a guess; the rule-based playbook makes no model calls,
+so its tokens and its cost are a real zero, and the dashboard labels them as such.
 
 ## How the benchmark works
 
