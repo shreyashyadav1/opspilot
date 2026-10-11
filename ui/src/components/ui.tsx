@@ -93,7 +93,7 @@ export function EmptyState({
   const Heading = `h${headingLevel}` as const;
   return (
     <div className={styles.empty}>
-      <Heading className={styles.emptyTitle}>{title}</Heading>
+      <Heading className={headingLevel === 1 ? undefined : styles.emptyTitle}>{title}</Heading>
       {children}
     </div>
   );

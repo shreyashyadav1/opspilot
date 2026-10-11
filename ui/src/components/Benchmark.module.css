@@ -208,7 +208,12 @@
 .definition {
   color: var(--ink-2);
   min-width: 260px;
-  max-width: 50ch;
+}
+
+/* Table cells ignore max-width; the text inside them does not. */
+.definition span {
+  display: block;
+  max-width: var(--measure);
 }
 
 .yes,

@@ -194,7 +194,9 @@ export function BenchmarkRunView({ runId }: { runId: string }) {
                 <tr key={row.label}>
                   <th scope="row">{row.label}</th>
                   <td className="numeric">{row.value}</td>
-                  <td className={styles.definition}>{row.definition}</td>
+                  <td className={styles.definition}>
+                    <span>{row.definition}</span>
+                  </td>
                 </tr>
               ))}
             </tbody>

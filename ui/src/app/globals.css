@@ -86,7 +86,7 @@
 @media (max-width: 640px) {
   :root {
     --gutter: 16px;
-    --text-2xl: 1.5rem;
+    --text-2xl: 1.625rem;
     --text-xl: 1.3125rem;
     --text-version: 1.625rem;
   }
