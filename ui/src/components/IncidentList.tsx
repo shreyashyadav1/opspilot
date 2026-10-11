@@ -41,10 +41,15 @@ function Row({ item, now }: { item: InvestigationSummary; now: number }) {
         <StatusBadge status={item.status} />
       </div>
       <div className={styles.alert}>
-        <Link href={`/investigations/${item.id}`} className={styles.link}>
+        {/* Alert titles repeat; the description (where it fired, its id) tells the links apart. */}
+        <Link
+          href={`/investigations/${item.id}`}
+          className={styles.link}
+          aria-describedby={`${item.id}-meta`}
+        >
           {item.alert.title}
         </Link>
-        <p className={styles.meta}>
+        <p className={styles.meta} id={`${item.id}-meta`}>
           <span>
             {item.alert.service ? `Fired on ${item.alert.service}` : "Service not specified"}
           </span>

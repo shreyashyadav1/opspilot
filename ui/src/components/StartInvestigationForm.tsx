@@ -217,7 +217,7 @@ export function StartInvestigationForm() {
           </div>
         ) : null}
 
-        <Button type="submit" variant="primary" size="large" disabled={submitting || blocked}>
+        <Button type="submit" variant="secondary" size="large" disabled={submitting || blocked}>
           {submitting ? "Starting…" : "Start investigation"}
         </Button>
       </form>

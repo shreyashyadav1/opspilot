@@ -3,7 +3,7 @@
 import { Ban, Check, CircleAlert, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
-import { actionLabel, categoryLabel, clockTime, offset, percent, STATUS } from "@/lib/format";
+import { actionLabel, categoryLabel, clockTime, offset, percent } from "@/lib/format";
 import {
   buildTimeline,
   callAnchor,
@@ -12,7 +12,7 @@ import {
   type GateState,
   type TimelineItem,
 } from "@/lib/timeline";
-import type { InvestigationDetail, TraceEvent } from "@/lib/types";
+import type { InvestigationDetail, Status, TraceEvent } from "@/lib/types";
 
 import { GateMark } from "./GateMark";
 import { JsonBlock } from "./JsonBlock";
@@ -161,7 +161,7 @@ function Gate({
         <GateMark className={styles.gateMark} />
         <div className={styles.body}>
           <h3 className={styles.title}>
-            Approval gate: <code>{request.data.tool}</code> on {action.target_service}
+            Approval gate for <code>{request.data.tool}</code> on {action.target_service}
           </h3>
           <p className={styles.gateText}>{GATE_TEXT[state]}</p>
           {decision ? (
@@ -215,7 +215,7 @@ function EventEntry({
       break;
     case "diagnosis": {
       const d = event.data.diagnosis;
-      title = `Diagnosis submitted: ${d.root_cause_service}, ${categoryLabel(d.category).toLowerCase()}`;
+      title = `Diagnosed ${categoryLabel(d.category).toLowerCase()} in ${d.root_cause_service}`;
       detail = (
         <p className={styles.meta}>
           Confidence {percent(d.confidence)}. Proposed:{" "}
@@ -246,7 +246,7 @@ function EventEntry({
       tone = event.data.ok ? styles.good : styles.bad;
       break;
     case "finished":
-      title = `Finished: ${STATUS[finishedStatus(event.data.outcome)].label.toLowerCase()}`;
+      title = FINISHED[finishedStatus(event.data.outcome)] ?? "Finished";
       break;
     case "note":
       title = event.data.message;
@@ -272,6 +272,15 @@ function EventEntry({
     </li>
   );
 }
+
+const FINISHED: Partial<Record<Status, string>> = {
+  executed: "Finished after the approved action ran",
+  action_failed: "Finished after the approved action failed",
+  rejected: "Finished without acting",
+  advisory: "Finished with a recommendation",
+  no_diagnosis: "Finished without a diagnosis",
+  failed: "Stopped with an error",
+};
 
 function finishedStatus(outcome: string) {
   const map = {
