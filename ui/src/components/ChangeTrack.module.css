@@ -5,6 +5,7 @@
   display: grid;
   gap: var(--space-3);
   min-width: 0;
+  container-type: inline-size;
 }
 
 /* The version line: older on the left, the running version on the right. */
@@ -143,6 +144,22 @@
   content: "";
   position: absolute;
   inset: -8px -4px;
+}
+
+/* Too narrow for three captions on one line: the citation takes its own line underneath. */
+@container (max-width: 400px) {
+  .track {
+    grid-template-areas:
+      "to . from"
+      "rail rail rail"
+      "to-caption . from-caption"
+      "citation citation citation";
+  }
+
+  .citation {
+    justify-self: start;
+    margin-top: var(--space-2);
+  }
 }
 
 /* States */

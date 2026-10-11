@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 
 import { ApiError, api } from "@/lib/api";
-import { rollbackPlan } from "@/lib/change";
+import { rollbackPlan, type RollbackPlan } from "@/lib/change";
 import { actionLabel, clockTime, percent } from "@/lib/format";
 import { useStoredValue } from "@/lib/hooks";
 import { callNumbers, gateState, type GateState } from "@/lib/timeline";
@@ -27,11 +27,14 @@ function verb(tool: string): string {
   return tool === "rollback_deploy" ? "rollback" : "action";
 }
 
-function title(state: GateState, noun: string, target: string): string {
+function title(state: GateState, noun: string, target: string, plan: RollbackPlan | null): string {
   const Noun = noun.charAt(0).toUpperCase() + noun.slice(1);
   switch (state) {
     case "pending":
-      return `Approve the ${noun} of ${target}?`;
+      // The question says exactly what approving does, when the evidence says it.
+      return plan?.from && plan.to
+        ? `Roll ${target} back from ${plan.from} to ${plan.to}?`
+        : `Approve the ${noun} of ${target}?`;
     case "rejected":
       return `${Noun} rejected`;
     case "failed":
@@ -107,6 +110,7 @@ export function DecisionPanel({
   }
 
   const approval = investigation.approval;
+  const anonymous = (reviewer.trim() || "operator") === "operator";
   const actionEvent = [...investigation.trace].reverse().find((event) => event.kind === "action");
 
   return (
@@ -118,7 +122,7 @@ export function DecisionPanel({
     >
       <div className={styles.heading}>
         <GateMark className={styles.mark} />
-        <h2 id={`${ids}-title`}>{title(state, noun, action.target_service)}</h2>
+        <h2 id={`${ids}-title`}>{title(state, noun, action.target_service, plan)}</h2>
       </div>
 
       {plan ? (
@@ -127,6 +131,7 @@ export function DecisionPanel({
           state={state}
           alertAt={alertAt}
           callNumber={plan.sourceSeq === null ? null : (numbers.get(plan.sourceSeq) ?? null)}
+          callAt={investigation.trace.find((event) => event.seq === plan.sourceSeq)?.at ?? null}
         />
       ) : (
         <p className={styles.generic}>
@@ -153,9 +158,6 @@ export function DecisionPanel({
 
       {state === "pending" ? (
         <>
-          <p className={styles.explain}>
-            The agent cannot run this itself: nothing changes until someone approves.
-          </p>
           <div className={styles.fields}>
             <div className={uiStyles.field}>
               <label htmlFor={`${ids}-reviewer`} className={uiStyles.label}>
@@ -170,6 +172,7 @@ export function DecisionPanel({
                 autoComplete="name"
                 spellCheck={false}
                 onChange={(event) => setReviewer(event.target.value)}
+                aria-describedby={anonymous ? `${ids}-reviewer-hint` : undefined}
               />
             </div>
             <div className={uiStyles.field}>
@@ -187,6 +190,11 @@ export function DecisionPanel({
                 onChange={(event) => setComment(event.target.value)}
               />
             </div>
+            {anonymous ? (
+              <p id={`${ids}-reviewer-hint`} className={`${uiStyles.hint} ${styles.wide}`}>
+                Recorded as “operator” unless you add your name.
+              </p>
+            ) : null}
           </div>
           {error ? (
             <Notice tone="danger" role="alert">
@@ -203,6 +211,11 @@ export function DecisionPanel({
             >
               {submitting === "approve" ? "Approving…" : `Approve ${noun}`}
             </Button>
+            <p id={`${ids}-approve-effect`} className={styles.effect}>
+              {request.tool === "rollback_deploy"
+                ? `Rolls ${action.target_service} back${plan?.to ? ` to ${plan.to}` : ""} now.`
+                : "Runs the action now."}
+            </p>
             <Button
               variant="secondary"
               size="large"
@@ -212,11 +225,6 @@ export function DecisionPanel({
             >
               {submitting === "reject" ? "Rejecting…" : "Reject"}
             </Button>
-            <p id={`${ids}-approve-effect`} className={styles.effect}>
-              {request.tool === "rollback_deploy"
-                ? `Rolls ${action.target_service} back${plan?.to ? ` to ${plan.to}` : ""} now.`
-                : "Runs the action now."}
-            </p>
             <p id={`${ids}-reject-effect`} className={styles.effect}>
               Ends the investigation. Nothing is changed.
             </p>

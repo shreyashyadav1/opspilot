@@ -8,7 +8,7 @@ import styles from "./ChangeTrack.module.css";
 const CAPTIONS: Record<GateState, { to: string; from: string; path: string | null }> = {
   pending: { to: "after rollback", from: "running now", path: null },
   executing: { to: "after rollback", from: "running now", path: "rolling back" },
-  executed: { to: "running now", from: "rolled back", path: null },
+  executed: { to: "running now", from: "was running", path: null },
   rejected: { to: "proposed", from: "still running", path: "not taken" },
   failed: { to: "intended", from: "still running", path: "did not complete" },
 };
@@ -47,6 +47,7 @@ export function ChangeTrack({
   state,
   alertAt,
   callNumber,
+  callAt,
 }: {
   plan: RollbackPlan;
   state: GateState;
@@ -54,6 +55,8 @@ export function ChangeTrack({
   alertAt: string;
   /** Number of the tool call the versions were read from, when there is one. */
   callNumber: number | null;
+  /** When that call ran: the versions are as of then. */
+  callAt: string | null;
 }) {
   const captions = CAPTIONS[state];
   const [beforeLabel, afterLabel] = CONFIG_LABELS[state];
@@ -62,7 +65,10 @@ export function ChangeTrack({
 
   return (
     <div className={`${styles.change} ${styles[state]}`}>
-      <p className="visually-hidden">{sentence(plan, state)}</p>
+      {/* A pending question with both versions already says this in its heading. */}
+      {state === "pending" && plan.from && plan.to ? null : (
+        <p className="visually-hidden">{sentence(plan, state)}</p>
+      )}
       <div className={styles.track} translate="no">
         <span className={`${styles.version} ${plan.to ? "" : styles.unknown}`} aria-hidden="true">
           {plan.to ?? "previous version"}
@@ -92,9 +98,9 @@ export function ChangeTrack({
           <span className={styles.citation}>
             <a
               href={`#${callAnchor(plan.sourceSeq)}`}
-              aria-label={`Versions read in call ${callNumber} of the timeline`}
+              aria-label={`Versions read${callAt ? ` at ${clockTime(callAt)}` : ""} in call ${callNumber} of the timeline`}
             >
-              read in call {callNumber}
+              read{callAt ? ` at ${clockTime(callAt)}` : ""} in call {callNumber}
             </a>
           </span>
         ) : null}
