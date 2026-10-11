@@ -69,6 +69,15 @@ export function DecisionPanel({
     previous.current = state;
   }, [state]);
 
+  // A note typed for a pending decision is not thrown away by a stray reload or tab close.
+  const unsent = state === "pending" && comment.trim() !== "";
+  useEffect(() => {
+    if (!unsent) return;
+    const keep = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", keep);
+    return () => window.removeEventListener("beforeunload", keep);
+  }, [unsent]);
+
   if (!request || !state) return null;
   const action = request.action;
   const noun = verb(request.tool);

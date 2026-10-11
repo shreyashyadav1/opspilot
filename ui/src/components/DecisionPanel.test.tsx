@@ -104,6 +104,19 @@ describe("DecisionPanel", () => {
     expect(screen.getByText("reported by the tool")).toBeInTheDocument();
   });
 
+  it("asks before a reload throws away an unsent note", async () => {
+    const user = userEvent.setup();
+    render(<DecisionPanel investigation={investigation()} onDecided={() => {}} />);
+    const reload = () => {
+      const event = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    expect(reload()).toBe(false);
+    await user.type(screen.getByLabelText(/Note/), "Matches the deploy diff");
+    expect(reload()).toBe(true);
+  });
+
   it("renders nothing when no action needs approval", () => {
     const { container } = render(
       <DecisionPanel
