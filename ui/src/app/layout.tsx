@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 import { AppHeader } from "@/components/AppHeader";
 
-import { mono, sans } from "./fonts";
+import { b612, intelOneMono } from "./fonts";
 import "./globals.css";
 import styles from "./layout.module.css";
 
@@ -22,7 +22,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable}`}>
+    <html lang="en" className={`${b612.variable} ${intelOneMono.variable}`}>
       <body>
         <a href="#main" className={styles.skip}>
           Skip to content
