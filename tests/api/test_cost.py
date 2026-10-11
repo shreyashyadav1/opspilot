@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+import pytest
+
 from tests.api.support import TERMINAL, build_app, serve, wait_for
 
 ALERT = {"alert": "Checkout error rate above SLO", "target": "storefront", "firing_minutes": 4}
@@ -16,6 +18,21 @@ async def test_fake_playbook_costs_exactly_zero(settings, tools):
         created = await client.post("/investigations", json=ALERT)
         done = await wait_for(client, created.json()["id"], TERMINAL)
         assert done["usage"]["cost_usd"] == 0.0
+
+
+async def test_priced_model_cost_follows_the_tokens_and_the_price_table(tmp_path, tools):
+    pricing = tmp_path / "pricing.yaml"
+    pricing.write_text("custom:priced:\n  input: 2.0\n  output: 8.0\n")
+    settings = replace(_base_settings(tmp_path), model="custom:priced", pricing_file=pricing)
+    async with serve(build_app(settings, tools, "escalate")) as client:
+        created = await client.post("/investigations", json=ALERT)
+        done = await wait_for(client, created.json()["id"], TERMINAL)
+    usage = done["usage"]
+    assert usage["input_tokens"] > 0
+    assert usage["output_tokens"] > 0
+    expected = (usage["input_tokens"] * 2.0 + usage["output_tokens"] * 8.0) / 1_000_000
+    assert usage["cost_usd"] == pytest.approx(expected)
+    assert usage["cost_usd"] > 0
 
 
 async def test_unpriced_model_reports_unknown_cost(tmp_path, tools):

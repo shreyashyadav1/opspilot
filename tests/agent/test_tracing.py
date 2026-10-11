@@ -148,3 +148,32 @@ async def test_rejected_rollback_still_traces_the_wait(traces):
     assert "approval_wait" in names
     assert "graph.rejected" in names
     assert "mcp.tool/rollback_deploy" not in names
+
+
+async def test_every_span_of_a_run_belongs_to_the_callers_trace(traces):
+    # One trace per investigation: nothing the graph does (sync nodes, concurrent tool tasks, the
+    # approval wait) may start a trace of its own or hang off a span that was never exported.
+    provider, exporter = traces
+    model = ScriptedChatModel(
+        responses=[
+            call("get_service_health", {}, "c1"),
+            submit(diagnosis("rollback_deploy")),
+        ]
+    )
+    with provider.get_tracer("test").start_as_current_span("investigation") as root:
+        await run_investigation(ALERT, model, toolset(), approve_all, tracer_provider=provider)
+
+    spans = exporter.get_finished_spans()
+    assert {span.context.trace_id for span in spans} == {root.get_span_context().trace_id}
+    by_id = {span.context.span_id: span for span in spans}
+    for span in spans:
+        node = span
+        while node.parent is not None:
+            node = by_id[node.parent.span_id]  # a KeyError here means an orphaned span
+        assert node.name == "investigation", f"{span.name} is not under the investigation"
+    # And the tree has the shape the trace view relies on.
+    parent_of = {span.name: by_id[span.parent.span_id].name for span in spans if span.parent}
+    assert parent_of["llm.chat"] == "graph.investigate"
+    assert parent_of["mcp.tool/get_service_health"] == "graph.tools"
+    assert parent_of["mcp.tool/rollback_deploy"] == "graph.execute_action"
+    assert parent_of["approval_wait"] == "investigation"

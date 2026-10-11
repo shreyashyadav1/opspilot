@@ -23,6 +23,7 @@ from fastapi import Depends, FastAPI, Query, Request
 from fastapi.responses import JSONResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from opentelemetry.sdk.trace import TracerProvider
 
 from opspilot_agent.llm import ModelSpecError, build_model
 from opspilot_api.benchmarks import BenchmarkRun, BenchmarkRunDetail, list_runs, load_run
@@ -81,10 +82,11 @@ def create_app(
     model_factory: ModelFactory | None = None,
     toolset_factory: ToolsetFactory | None = None,
     chaos_transport: httpx.AsyncBaseTransport | None = None,
+    tracer_provider: TracerProvider | None = None,
 ) -> FastAPI:
     settings = settings or ApiSettings.from_env()
     build = model_factory or build_model
-    tracer_provider = configure("opspilot-agent-api")
+    tracer_provider = tracer_provider or configure("opspilot-agent-api")
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
