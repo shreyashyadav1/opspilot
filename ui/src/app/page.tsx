@@ -1,8 +1,12 @@
+import type { Metadata } from "next";
+
 import { DemoFaultPanel } from "@/components/DemoFaultPanel";
 import { IncidentList } from "@/components/IncidentList";
 import { StartInvestigationForm } from "@/components/StartInvestigationForm";
 
 import styles from "./page.module.css";
+
+export const metadata: Metadata = { title: "Incidents" };
 
 export default function IncidentsPage() {
   return (
