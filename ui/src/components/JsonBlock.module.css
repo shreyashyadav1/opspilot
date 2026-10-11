@@ -3,10 +3,12 @@
   padding: var(--space-3);
   max-height: 320px;
   overflow: auto;
-  background: var(--surface-sunk);
+  overscroll-behavior: contain;
+  background: var(--night);
   border: 1px solid var(--rule);
-  border-radius: var(--radius-panel);
-  font-size: var(--text-xs);
+  border-radius: var(--radius-m);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
   line-height: 1.55;
   white-space: pre-wrap;
   overflow-wrap: anywhere;

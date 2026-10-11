@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { executed, investigation, rejected } from "@/test/fixtures";
+import { executed, investigation, rejected, withDeployHistory } from "@/test/fixtures";
 
 import { Timeline } from "./Timeline";
 
@@ -17,6 +17,17 @@ describe("Timeline", () => {
     expect(calls[1]).toHaveTextContent("get_recent_deploys(since_minutes=60)");
     expect(calls[1]).toHaveTextContent("failed");
     expect(screen.getByText("The deploy explains it.")).toBeInTheDocument();
+  });
+
+  it("numbers the tool calls and gives each an anchor to cite", () => {
+    render(<Timeline investigation={withDeployHistory()} />);
+    const calls = within(screen.getByRole("list", { name: "Tool calls of turn 1" })).getAllByRole(
+      "listitem",
+    );
+    expect(calls.map((call) => call.id)).toEqual(["call-3", "call-4"]);
+    expect(calls[0]).toHaveTextContent("Call 1");
+    expect(calls[1]).toHaveTextContent("Call 2");
+    expect(screen.getByText("2 tool calls in 1.1 s")).toBeInTheDocument();
   });
 
   it("draws the approval gate with the action waiting behind it", () => {
