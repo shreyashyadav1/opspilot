@@ -100,13 +100,17 @@ export function InvestigationView({ investigationId }: { investigationId: string
           </div>
           <div>
             <dt>ID</dt>
-            <dd className={styles.code}>{data.id}</dd>
+            <dd className={styles.code} translate="no">
+              {data.id}
+            </dd>
           </div>
           {data.trace_id ? (
             <div className={styles.wide}>
               <dt>Trace</dt>
               <dd className={styles.traceValue}>
-                <code title="Look this up in the trace backend">{data.trace_id}</code>
+                <code title="Look this up in the trace backend" translate="no">
+                  {data.trace_id}
+                </code>
                 <CopyButton value={data.trace_id} label="Copy the trace id" />
               </dd>
             </div>

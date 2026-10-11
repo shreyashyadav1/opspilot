@@ -63,7 +63,7 @@ export function ChangeTrack({
   return (
     <div className={`${styles.change} ${styles[state]}`}>
       <p className="visually-hidden">{sentence(plan, state)}</p>
-      <div className={styles.track}>
+      <div className={styles.track} translate="no">
         <span className={`${styles.version} ${plan.to ? "" : styles.unknown}`} aria-hidden="true">
           {plan.to ?? "previous version"}
         </span>
@@ -121,7 +121,7 @@ export function ChangeTrack({
       ) : null}
 
       {plan.config.length > 0 ? (
-        <dl className={styles.config}>
+        <dl className={styles.config} translate="no">
           {plan.config.map((change) => (
             <div key={change.key} className={styles.configRow}>
               <dt>

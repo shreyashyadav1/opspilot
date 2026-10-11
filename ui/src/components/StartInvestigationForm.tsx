@@ -42,14 +42,19 @@ export function StartInvestigationForm() {
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    // Invalid input: say what to fix and put the cursor in the field that needs it.
+    const field = (name: string) =>
+      (event.currentTarget.elements.namedItem(name) as HTMLElement | null)?.focus();
     const title = alert.trim();
     if (title.length < 3) {
       setError("Describe the alert in at least 3 characters.");
+      field("alert");
       return;
     }
     const minutes = firing.trim() ? Number(firing) : null;
     if (minutes !== null && (!Number.isInteger(minutes) || minutes < 1 || minutes > 240)) {
       setError("Firing time must be a whole number of minutes between 1 and 240.");
+      field("firing_minutes");
       return;
     }
     setSubmitting(true);

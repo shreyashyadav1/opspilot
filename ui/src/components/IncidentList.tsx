@@ -48,7 +48,9 @@ function Row({ item, now }: { item: InvestigationSummary; now: number }) {
           <span>
             {item.alert.service ? `Fired on ${item.alert.service}` : "Service not specified"}
           </span>
-          <span className={styles.id}>{item.id}</span>
+          <span className={styles.id} translate="no">
+            {item.id}
+          </span>
         </p>
       </div>
       <div className={styles.cause}>

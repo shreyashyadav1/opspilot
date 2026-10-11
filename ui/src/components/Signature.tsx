@@ -8,7 +8,7 @@ import styles from "./Signature.module.css";
 export function Signature({ tool, args }: { tool: string; args: Record<string, unknown> }) {
   const entries = Object.entries(args);
   return (
-    <code className={styles.signature}>
+    <code className={styles.signature} translate="no">
       {tool}(
       {entries.map(([key, value], index) => (
         <Fragment key={key}>
