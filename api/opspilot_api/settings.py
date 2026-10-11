@@ -10,6 +10,9 @@
   (default `evals/results`).
 - OPSPILOT_MAX_CONCURRENT (default 2) and OPSPILOT_MAX_TURNS (default 12): how many
   investigations run at once, and the model turn budget of each.
+- OPSPILOT_PRICING_FILE: USD-per-million-token price table used to cost each investigation
+  (default `evals/pricing.yaml`, the same file the benchmark prices its runs from). A model
+  missing from it is reported with unknown cost rather than a guessed one.
 """
 
 from __future__ import annotations
@@ -43,6 +46,7 @@ class ApiSettings:
     simulation: Path | None = None
     chaos_url: str | None = None
     results_dir: Path = field(default_factory=lambda: REPO_ROOT / "evals" / "results")
+    pricing_file: Path = field(default_factory=lambda: REPO_ROOT / "evals" / "pricing.yaml")
     max_concurrent: int = 2
     max_turns: int = 12
 
@@ -66,6 +70,7 @@ class ApiSettings:
         defaults = cls()
         simulation = os.getenv("OPSPILOT_SIMULATION")
         results = os.getenv("OPSPILOT_RESULTS_DIR")
+        pricing = os.getenv("OPSPILOT_PRICING_FILE")
         return cls(
             data_dir=Path(os.getenv("OPSPILOT_API_DATA_DIR", str(defaults.data_dir))),
             model=default_model(),
@@ -73,6 +78,7 @@ class ApiSettings:
             simulation=Path(simulation) if simulation else None,
             chaos_url=os.getenv("OPSPILOT_CHAOS_URL") or None,
             results_dir=Path(results) if results else defaults.results_dir,
+            pricing_file=Path(pricing) if pricing else defaults.pricing_file,
             max_concurrent=int(os.getenv("OPSPILOT_MAX_CONCURRENT", str(defaults.max_concurrent))),
             max_turns=int(os.getenv("OPSPILOT_MAX_TURNS", str(defaults.max_turns))),
         )

@@ -17,11 +17,12 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-import httpx
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import JSONResponse
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 from opsdemo.common.logs import configure_logging
+from opsdemo.common.service import build_tracer_provider, instrumented_client
 from opsdemo.control_plane.chaos import (
     ChaosError,
     ControlPlane,
@@ -69,7 +70,10 @@ async def _reset_when_ready(plane: ControlPlane, attempts: int = 45, delay_s: fl
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    client = httpx.AsyncClient()
+    # Instrumented so a rollback (and any other deploy-registry call) that arrives with a
+    # traceparent header - from the MCP server, on behalf of an investigation - continues that
+    # trace into the target service's admin API.
+    client = instrumented_client(tracer_provider)
     app.state.plane = ControlPlane(ServiceAdmin(service_urls_from_env(), client), DeployRegistry())
     task = None
     if os.getenv("CP_RESET_ON_STARTUP", "true").lower() == "true":
@@ -81,7 +85,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 configure_logging("control-plane")
+tracer_provider = build_tracer_provider("control-plane")
 app = FastAPI(title="OpsPilot demo control plane", lifespan=lifespan)
+# /chaos/* (fault injection, benchmark-only) is excluded so fault injection itself leaves no
+# trace, matching how it is already kept out of logs and metrics.
+FastAPIInstrumentor.instrument_app(
+    app, tracer_provider=tracer_provider, excluded_urls="health,chaos"
+)
 
 
 @app.exception_handler(ChaosError)

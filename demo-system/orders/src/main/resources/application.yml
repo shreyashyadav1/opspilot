@@ -60,6 +60,13 @@ management:
   tracing:
     sampling:
       probability: 1.0
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/traces
+      export:
+        # Off by default so running the service (and its tests) never needs a trace backend;
+        # docker-compose sets this alongside OTEL_EXPORTER_OTLP_ENDPOINT when tracing is on.
+        enabled: ${OPSPILOT_TRACING_ENABLED:false}
 
 orders:
   version: ${SERVICE_VERSION:1.8.3}

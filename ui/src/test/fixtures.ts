@@ -9,6 +9,8 @@ import type {
 const at = (seconds: number) =>
   new Date(Date.UTC(2026, 8, 28, 21, 4, 12) + seconds * 1000).toISOString();
 
+export const TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736";
+
 export const PLAYBOOK = {
   spec: "fake:playbook",
   kind: "baseline" as const,
@@ -18,9 +20,9 @@ export const PLAYBOOK = {
 };
 
 export const LLM = {
-  spec: "groq:llama-3.3-70b-versatile",
+  spec: "groq:openai/gpt-oss-120b",
   kind: "llm" as const,
-  label: "llama-3.3-70b-versatile",
+  label: "openai/gpt-oss-120b",
   description: "LLM served by Groq.",
 };
 
@@ -145,10 +147,19 @@ export function investigation(overrides: Partial<InvestigationDetail> = {}): Inv
     approval_request: REQUEST,
     approval: null,
     action_result: null,
-    usage: { turns: 2, model_calls: 2, tool_calls: 2, input_tokens: 900, output_tokens: 120 },
+    usage: {
+      turns: 2,
+      model_calls: 2,
+      tool_calls: 2,
+      input_tokens: 900,
+      output_tokens: 120,
+      // Matches the default fixture model, PLAYBOOK: a real, priced zero (see evals/pricing.yaml).
+      cost_usd: 0.0,
+    },
     time_to_diagnosis_s: 1,
     error: null,
     trace: pendingTrace(),
+    trace_id: TRACE_ID,
     ...overrides,
   };
 }

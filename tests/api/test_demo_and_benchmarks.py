@@ -139,7 +139,7 @@ async def test_benchmarks_list_only_runs_that_exist(settings):
         write_run(
             results, "run-a-simulated-fake-playbook", "simulated", "fake:playbook", "2026-09-01"
         )
-        write_run(results, "run-b-live-groq", "live", "groq:llama-3.3-70b-versatile", "2026-09-02")
+        write_run(results, "run-b-live-groq", "live", "groq:openai/gpt-oss-120b", "2026-09-02")
         (results / "broken").mkdir()
         (results / "broken" / "results.json").write_text("{not json")
         (results / "notes.txt").write_text("not a run")

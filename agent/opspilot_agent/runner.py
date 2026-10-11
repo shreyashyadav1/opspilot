@@ -12,6 +12,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
+from opentelemetry import trace
 
 from opspilot_agent.graph import AgentConfig, build_graph
 from opspilot_agent.mcp_client import ToolSet
@@ -69,8 +70,17 @@ async def run_investigation(
     *,
     config: AgentConfig | None = None,
     on_event: EventHandler | None = None,
+    tracer_provider: trace.TracerProvider | None = None,
 ) -> InvestigationResult:
-    graph = build_graph(model, tools.read, tools.write, config=config, checkpointer=InMemorySaver())
+    tracer = (tracer_provider or trace.get_tracer_provider()).get_tracer("opspilot.agent")
+    graph = build_graph(
+        model,
+        tools.read,
+        tools.write,
+        config=config,
+        checkpointer=InMemorySaver(),
+        tracer_provider=tracer_provider,
+    )
     thread: dict[str, Any] = {
         "configurable": {"thread_id": uuid.uuid4().hex},
         "recursion_limit": 80,
@@ -97,7 +107,8 @@ async def run_investigation(
         requests.append(request)
         if on_event is not None:
             on_event("approval_request", request)
-        approval = await approval_handler(request)
+        with tracer.start_as_current_span("approval_wait"):
+            approval = await approval_handler(request)
         payload = Command(resume=approval.model_dump())
 
     state = snapshot.values

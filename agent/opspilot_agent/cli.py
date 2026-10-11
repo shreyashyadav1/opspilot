@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from opentelemetry import trace
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm
@@ -29,6 +30,7 @@ from opspilot_agent.runner import (
     run_investigation,
 )
 from opspilot_agent.schemas import ApprovalDecision
+from opspilot_observability.tracing import configure
 
 console = Console(stderr=True)
 
@@ -93,17 +95,23 @@ async def _investigate(args: argparse.Namespace) -> int:
         "no": reject_all,
     }
     alert = alert_message(args.alert, args.service, args.details or args.alert)
-    connection = stdio_connection(args.backend, args.simulation)
-    async with mcp_toolset(connection) as tools:
-        console.print(f"Investigating with {args.model or DEFAULT_MODEL} ({args.backend} backend)")
-        result = await run_investigation(
-            alert,
-            model,
-            tools,
-            handlers[args.approve],
-            config=AgentConfig(max_turns=args.max_turns),
-            on_event=_print_event,
-        )
+    tracer = trace.get_tracer("opspilot.agent")
+    with tracer.start_as_current_span(
+        "investigation", attributes={"opspilot.alert.service": args.service}
+    ):
+        connection = stdio_connection(args.backend, args.simulation)
+        async with mcp_toolset(connection) as tools:
+            console.print(
+                f"Investigating with {args.model or DEFAULT_MODEL} ({args.backend} backend)"
+            )
+            result = await run_investigation(
+                alert,
+                model,
+                tools,
+                handlers[args.approve],
+                config=AgentConfig(max_turns=args.max_turns),
+                on_event=_print_event,
+            )
     _render(result)
     if args.json:
         print(json.dumps(result.to_dict(), indent=2, default=str))
@@ -124,6 +132,7 @@ def main(argv: list[str] | None = None) -> None:
     inv.add_argument("--max-turns", type=int, default=12)
     inv.add_argument("--json", action="store_true", help="print the full result as JSON")
     args = parser.parse_args(argv)
+    configure("opspilot-agent-cli")
     sys.exit(asyncio.run(_investigate(args)))
 
 

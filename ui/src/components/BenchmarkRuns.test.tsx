@@ -28,7 +28,7 @@ describe("BenchmarkRuns", () => {
     renderWithSWR(<BenchmarkRuns />);
     const links = await screen.findAllByRole("link");
     expect(links.map((link) => link.textContent)).toEqual([
-      "llama-3.3-70b-versatile",
+      "openai/gpt-oss-120b",
       "Rule-based playbook",
     ]);
     expect(screen.getByText("Baseline, not an LLM")).toBeInTheDocument();

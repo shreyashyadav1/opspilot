@@ -87,6 +87,14 @@ export function InvestigationView({ investigationId }: { investigationId: string
             <dt>ID</dt>
             <dd className="numeric">{data.id}</dd>
           </div>
+          {data.trace_id ? (
+            <div>
+              <dt>Trace</dt>
+              <dd className={`numeric ${styles.traceId}`} title="Look this up in the trace backend">
+                {data.trace_id}
+              </dd>
+            </div>
+          ) : null}
         </dl>
         {live ? (
           <p className={styles.live}>

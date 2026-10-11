@@ -103,6 +103,7 @@ The system has six parts that can be developed and tested independently:
 | Benchmark | `evals/` | Python | Scenarios, runner, scoring, reports |
 | Agent API | `api/` | Python (FastAPI) | Runs investigations in the background, persists them, applies approval decisions |
 | Dashboard | `ui/` | TypeScript (Next.js) | Incident list, investigation timeline, approve and reject, benchmark browser |
+| Observability | `observability/` | Python | Shared OpenTelemetry setup (tracer provider, trace-context propagation) used by the agent, the API and the MCP server |
 
 A hard boundary runs between the benchmark harness and the agent. The harness talks to the
 chaos API and sees ground truth; the agent only sees what the MCP tools return. The MCP server
@@ -134,8 +135,11 @@ Telemetry, kept consistent across both languages:
   buckets, labels `method`, `uri`, `status`, `outcome`) and `http_client_requests_seconds` for
   outbound calls. Orders additionally exposes HikariCP pool metrics. Identical metric names
   mean one PromQL catalog covers all services.
-- **Traces**: W3C trace context propagates storefront -> orders -> payments (OpenTelemetry in
-  Python, Micrometer Tracing in Spring). Export to a trace backend is optional.
+- **Traces**: W3C trace context propagates storefront -> orders -> payments, and from the MCP
+  server into the control plane (deploy history, rollbacks) (OpenTelemetry in Python,
+  Micrometer Tracing in Spring). Health, metrics, admin and chaos requests are not traced.
+  Spans are always created; export to the trace backend is opt in
+  (`OPSPILOT_TRACING_ENABLED`, see 3.6).
 - **Health**: `/health` (Python) and `/actuator/health` (Spring, includes the database check).
 - **Deploys**: the control plane records every deploy and rollback with version, author,
   change summary and config diff. It seeds a realistic history on startup.
@@ -247,8 +251,9 @@ Only `rollback_deploy` is executable today. The other action types are recommend
 the operator carries out.
 
 **Models.** Any OpenAI-compatible chat endpoint through `langchain-openai`. The default is Groq
-`llama-3.3-70b-versatile` with the key read from `GROQ_API_KEY` in `.env`. Two deterministic
-fakes implement the same LangChain chat-model interface:
+`openai/gpt-oss-120b` (a reasoning model; its reasoning tokens count against `max_tokens`, set
+generously for that) with the key read from `GROQ_API_KEY` in `.env`. Two deterministic fakes
+implement the same LangChain chat-model interface:
 
 - `ScriptedChatModel` replays a fixed list of responses. Unit tests use it to drive every branch
   of the graph.
@@ -330,6 +335,50 @@ incident list (pending decisions first) with the start form and the demo fault p
 investigation page, with a live timeline in which the approval gate is drawn across the steps,
 the diagnosis, and the decision panel; and the benchmark browser, which lists only runs that
 exist and labels the playbook as a rule-based baseline and simulated runs as harness checks.
+
+### 3.6 Observability (`observability/opspilot_observability`)
+
+One OpenTelemetry trace per investigation, built from spans created by the agent, the MCP
+server and (where the services' own instrumentation allows it) the demo system:
+
+- **Per graph node** (`graph.investigate`, `graph.tools`, `graph.validate`,
+  `graph.approval_gate`, `graph.execute_action`, ...): one span per node invocation.
+- **Per model call** (`llm.chat`, nested under `graph.investigate`): the model name and the
+  input and output token counts reported by the provider; latency is the span's own duration.
+- **Per MCP tool call** (`mcp.tool/<name>`, nested under `graph.tools` or `graph.execute_action`
+  on the agent side, and created again on the MCP server as the call is handled): the tool
+  name, a bounded JSON summary of its arguments, the result size in characters, and latency.
+- **The approval wait** (`approval_wait`): brackets the approval callback in the CLI and the
+  benchmark. In the agent API, where the wait can cross a browser session or an API restart,
+  it is instead built from the persisted request and decision timestamps and attached to the
+  investigation's trace through its stored trace id, rather than kept open as a live span.
+
+**Propagation into the demo system.** The agent passes its current span's W3C `traceparent` to
+the MCP server subprocess once, as an environment variable (stdio has no headers to carry it
+otherwise), together with the tracing switch and endpoint; every tool call the server handles is
+a child of that investigation's trace. The server's HTTP client is instrumented, so each call it
+makes carries the trace on: a deploy-history read or a `rollback_deploy` continues into the
+control plane, and the control plane's own call to a service's admin API shows up as a client
+span under the rollback. Where tracing stops is deliberate and the same in every service:
+health checks, metrics scrapes, admin endpoints (config pushes) and the chaos API are kept out of
+traces just as they are kept out of logs and metrics. A health check made by the MCP server
+therefore appears only as the server's own client span, and fault injection leaves no trace.
+
+**Export and the trace backend.** Every process (the CLI, the agent API, the MCP server
+subprocess, each demo service) always creates spans so trace ids exist for correlation, but
+only exports them when `OPSPILOT_TRACING_ENABLED=true`; without it, no process ever opens a
+connection to a trace backend, so tests and CI need none. Exporting sends OTLP/HTTP to
+`OTEL_EXPORTER_OTLP_ENDPOINT` (default `http://localhost:4318`). docker compose runs a Jaeger
+all-in-one container (in-memory storage, UI on `:8166`) on the `dashboard` and `tracing`
+profiles.
+
+**Cost per incident.** Token usage is tracked per investigation (`Usage` in the agent API,
+`ScenarioScore` in the benchmark). The benchmark already priced its runs from
+`evals/pricing.yaml` (USD per million input/output tokens); the agent API now prices each
+investigation from the same file (`usage.cost_usd`), by the model in use. A model absent from
+that file prices as `null` (unknown), never a guess; `fake:playbook` prices at zero and reports
+a real zero token count rather than the character-based estimate used only to drive the fakes in
+unit tests, so its zero cost is not a tracking gap wearing a number.
 
 ## 4. Data flow for one incident
 
@@ -443,12 +492,16 @@ Rules and caveats:
   - [x] Benchmark results browser that labels the rule-based baseline
   - [x] Tests: pytest for the API, Vitest and Testing Library for components, Playwright smoke
         tests with accessibility checks; CI jobs and docker compose services
-- [ ] **M6: Agent observability**
-  - [ ] Trace every agent run (Langfuse or OpenTelemetry GenAI conventions): model calls,
-        tool calls, latency and tokens per step
-  - [ ] Export demo-system traces to a trace backend (the Python services already export over
-        OTLP when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; orders needs an exporter) and add a
-        `get_trace` tool
+- [x] **M6: Agent observability**
+  - [x] OpenTelemetry trace per investigation: a span per graph node, per model call (model,
+        input/output tokens, latency) and per MCP tool call (name, argument summary, result
+        size, latency), plus the approval wait
+  - [x] Propagate trace context into the demo system so a tool call that reaches it (deploys,
+        rollbacks) lands in the same trace; export from every service, including orders
+        (Micrometer Tracing's OTLP exporter) - a Jaeger backend in docker compose, off by
+        default (`OPSPILOT_TRACING_ENABLED`)
+  - [x] Cost per incident: token usage and an estimated cost (`evals/pricing.yaml`) in the
+        agent API response, the dashboard's investigation page and the benchmark output
 - [ ] **M7: Kubernetes and cloud**
   - [ ] kind cluster with Helm charts for the demo system, the MCP server and the agent API
   - [ ] Loki log backend for the MCP server

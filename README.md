@@ -8,7 +8,7 @@ anything. A fault-injection benchmark with known root causes scores the agent on
 accuracy, tool-call precision, steps, time to diagnosis and token cost per incident.
 
 The agent is a LangGraph state machine on top of any OpenAI-compatible model (Groq
-`llama-3.3-70b-versatile` by default). The system under investigation is a Docker Compose
+`openai/gpt-oss-120b` by default). The system under investigation is a Docker Compose
 stack: FastAPI and Spring Boot services, Postgres, Prometheus, a load generator, and a control
 plane that injects faults and records their ground truth. An operator dashboard (Next.js, on a
 FastAPI agent API) shows each investigation as it happens and is where a person approves or
@@ -113,7 +113,7 @@ open http://localhost:8100
 
 Without an API key the agent API uses the rule-based playbook (`fake:playbook`), which the
 dashboard labels as a baseline, not an LLM. With `GROQ_API_KEY` in `.env`, it uses
-`llama-3.3-70b-versatile` and still offers the playbook for comparison. Investigations and
+`openai/gpt-oss-120b` and still offers the playbook for comparison. Investigations and
 pending approvals survive restarts of the API; `make down` removes them with the other volumes.
 
 For development, run the API and the dashboard on the host against `make up`:
@@ -124,6 +124,39 @@ make api-dev     # agent API on :8180, reloads on code changes
 make ui-dev      # dashboard on :8100, proxies /api to :8180
 make api-test ui-test ui-e2e   # pytest; lint, types, Vitest; Playwright smoke tests (Chrome)
 ```
+
+## Tracing
+
+Every investigation is one OpenTelemetry trace: a span per graph node, per model call (model,
+tokens, latency) and per MCP tool call (name, arguments, result size, latency), plus the
+approval wait. A tool call that reaches the demo system (a deploy-history read, a rollback)
+carries that trace into it, so it shows up in the same trace where the services' own
+instrumentation allows it.
+
+Tracing is off until you turn it on:
+
+```bash
+echo "OPSPILOT_TRACING_ENABLED=true" >> .env
+make dashboard-up        # or: make up-tracing, for the demo system plus Jaeger without the API
+open http://localhost:8166    # Jaeger UI; search for a service such as opspilot-agent-api
+```
+
+Each investigation page shows its trace id; paste it into Jaeger's "Lookup by Trace ID" box to
+open that run. The trace has one root `investigation` span, a `graph.*` span per node with
+`llm.chat` and `mcp.tool/<name>` spans beneath, the `approval_wait`, and, when the run is
+resumed after a decision, the resumed run's spans in the same trace.
+
+With tracing off (the default), every service still creates spans locally but none are
+exported, so nothing here needs a trace backend running: unit tests and CI are unaffected.
+
+## Cost per incident
+
+Token usage is recorded per investigation and priced from [`evals/pricing.yaml`](evals/pricing.yaml)
+(USD per million input and output tokens, with the source of each price cited in the file). The
+estimate appears next to the turns and tool calls on the investigation page, as `usage.cost_usd`
+in the agent API response, and in the benchmark summary. A model missing from the price table is
+reported with an unknown cost rather than a guess; the rule-based playbook makes no model calls,
+so its tokens and its cost are a real zero, and the dashboard labels them as such.
 
 ## How the benchmark works
 
@@ -164,8 +197,8 @@ Two environments share the same runner:
 
 ```bash
 make up
-make eval MODEL=groq:llama-3.3-70b-versatile   # needs GROQ_API_KEY in .env
-.venv/bin/opspilot-eval --env live --model groq:llama-3.3-70b-versatile --repeats 3
+make eval MODEL=groq:openai/gpt-oss-120b   # needs GROQ_API_KEY in .env
+.venv/bin/opspilot-eval --env live --model groq:openai/gpt-oss-120b --repeats 3
 ```
 
 ## Results
@@ -194,7 +227,9 @@ the model, date, commit and number of repetitions.
 - [ ] M4 Benchmark: harness, scenarios and CI run are done; first real LLM run pending
 - [x] M5 Operator dashboard (Next.js + TypeScript) on a FastAPI agent API: incidents, reasoning
   trace, approve and reject, benchmark browser
-- [ ] M6 Agent observability: Langfuse or OpenTelemetry traces of every model and tool call
+- [x] M6 Agent observability: an OpenTelemetry trace per investigation (model and tool calls,
+  the approval wait), propagated into the demo system, a Jaeger backend in docker compose, and
+  cost per incident in the API, the dashboard and the benchmark
 - [ ] M7 Kubernetes (kind + Helm), Loki log backend, cloud deployment
 
 See the milestone details in [docs/DESIGN.md](docs/DESIGN.md#7-milestones).
@@ -208,6 +243,7 @@ ui/                        dashboard (Next.js): pages, components, Vitest and Pl
 mcp-servers/opspilot_mcp/  MCP server, metric catalog, log search, live and simulated backends
 evals/                     scenarios, pricing, runner, scorer, reports
 demo-system/               docker compose, Python services, Spring Boot orders, Prometheus
+observability/             shared OpenTelemetry setup used by the agent, the API and the MCP server
 tests/                     unit tests; tests/integration runs only when the stack is up
 docs/DESIGN.md             design and evaluation methodology
 ```

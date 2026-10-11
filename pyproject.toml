@@ -20,6 +20,10 @@ dependencies = [
     "langgraph==1.2.12",
     "langgraph-checkpoint-sqlite==3.1.1",
     "mcp==1.30.0",
+    "opentelemetry-api==1.44.0",
+    "opentelemetry-exporter-otlp-proto-http==1.44.0",
+    "opentelemetry-instrumentation-httpx==0.65b0",
+    "opentelemetry-sdk==1.44.0",
     "pydantic==2.13.5",
     "python-dotenv==1.2.3",
     "pyyaml==6.0.3",
@@ -46,6 +50,7 @@ packages = [
     "api/opspilot_api",
     "mcp-servers/opspilot_mcp",
     "evals/opspilot_evals",
+    "observability/opspilot_observability",
 ]
 
 [tool.ruff]
@@ -60,7 +65,14 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["opsdemo", "opspilot_agent", "opspilot_api", "opspilot_evals", "opspilot_mcp"]
+known-first-party = [
+    "opsdemo",
+    "opspilot_agent",
+    "opspilot_api",
+    "opspilot_evals",
+    "opspilot_mcp",
+    "opspilot_observability",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

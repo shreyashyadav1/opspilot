@@ -25,12 +25,19 @@ from opsdemo.common.runtime import ServiceRuntime
 Lifespan = Callable[[FastAPI], AbstractAsyncContextManager[None]]
 
 
-def build_tracer_provider(runtime: ServiceRuntime) -> TracerProvider:
-    """Spans are always created so trace ids reach the logs; export is opt-in via OTLP env."""
+def _tracing_enabled() -> bool:
+    return os.getenv("OPSPILOT_TRACING_ENABLED", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def build_tracer_provider(service_name: str, service_version: str = "0.0.0") -> TracerProvider:
+    """Spans are always created so trace ids reach the logs; export is opt-in
+    (OPSPILOT_TRACING_ENABLED) so no service needs a trace backend to run or to be tested.
+    OTEL_EXPORTER_OTLP_ENDPOINT picks where spans go when export is on (OTLPSpanExporter's own
+    default is http://localhost:4318 otherwise)."""
     provider = TracerProvider(
-        resource=Resource.create({"service.name": runtime.name, "service.version": runtime.version})
+        resource=Resource.create({"service.name": service_name, "service.version": service_version})
     )
-    if os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"):
+    if _tracing_enabled():
         provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
     return provider
 
@@ -49,7 +56,7 @@ def create_service_app(
     `lifespan` runs after `app.state.runtime` and `app.state.tracer_provider` are set.
     """
     configure_logging(runtime.name, version_getter=lambda: runtime.version)
-    provider = build_tracer_provider(runtime)
+    provider = build_tracer_provider(runtime.name, runtime.version)
 
     app = FastAPI(title=title, version=runtime.version, lifespan=lifespan)
     app.state.runtime = runtime

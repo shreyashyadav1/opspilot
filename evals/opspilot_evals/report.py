@@ -33,6 +33,11 @@ def render_markdown(run: dict[str, Any]) -> str:
             "- Simulated environment: these numbers check the harness and the baseline, "
             "they are not benchmark results."
         )
+    if meta["model"].startswith("fake:"):
+        lines.append(
+            "- fake models make no model calls: tokens and cost below are genuinely zero, "
+            "not an unmeasured gap."
+        )
     lines += [
         "",
         "| Metric | Value |",

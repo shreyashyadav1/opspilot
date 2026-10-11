@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from langchain_core.language_models import BaseChatModel
+from opentelemetry import trace
 
 from opspilot_agent.graph import AgentConfig
 from opspilot_agent.mcp_client import mcp_toolset
@@ -18,6 +19,7 @@ from opspilot_agent.runner import ApprovalHandler, run_investigation
 from opspilot_evals.environments import Environment
 from opspilot_evals.scenario import Scenario
 from opspilot_evals.scoring import Pricing, ScenarioScore, aggregate, score_investigation
+from opspilot_observability.tracing import subprocess_env
 
 log = logging.getLogger(__name__)
 
@@ -49,9 +51,13 @@ async def run_scenario(
     )
     error = None
     investigation: dict[str, Any] = {}
+    tracer = trace.get_tracer("opspilot.eval")
     try:
-        async with mcp_toolset(prepared.connection) as tools:
-            result = await run_investigation(alert, model, tools, approval, config=config)
+        attributes = {"opspilot.scenario": scenario.id}
+        with tracer.start_as_current_span("investigation", attributes=attributes):
+            prepared.connection["env"].update(subprocess_env())
+            async with mcp_toolset(prepared.connection) as tools:
+                result = await run_investigation(alert, model, tools, approval, config=config)
         investigation = result.to_dict()
     except Exception as exc:  # one failing scenario must not abort the whole run
         log.exception("scenario %s failed", scenario.id)

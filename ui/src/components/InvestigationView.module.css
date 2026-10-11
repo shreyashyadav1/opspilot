@@ -54,6 +54,10 @@
   font-weight: 600;
 }
 
+.traceId {
+  overflow-wrap: anywhere;
+}
+
 .model {
   display: inline-flex;
   flex-wrap: wrap;

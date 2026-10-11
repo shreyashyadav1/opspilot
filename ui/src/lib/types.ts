@@ -111,6 +111,9 @@ export interface Usage {
   tool_calls: number;
   input_tokens: number;
   output_tokens: number;
+  // null when the model in use has no entry in the price table; 0 is a real, priced zero (the
+  // fake:playbook baseline makes no model calls).
+  cost_usd: number | null;
 }
 
 export interface ToolCallData {
@@ -164,6 +167,9 @@ export interface InvestigationDetail extends InvestigationSummary {
   time_to_diagnosis_s: number | null;
   error: string | null;
   trace: TraceEvent[];
+  // OpenTelemetry trace id of this investigation (paste it into the trace backend's lookup).
+  // null until the run has started, and when it was started by an API without tracing support.
+  trace_id: string | null;
 }
 
 export interface ServiceConfig {

@@ -12,11 +12,16 @@ import logging
 import os
 from pathlib import Path
 
+from opentelemetry.sdk.trace import TracerProvider
+
 from opspilot_mcp.backends.base import TelemetryBackend
 from opspilot_mcp.server import build_server
+from opspilot_observability.tracing import configure
 
 
-def build_backend(kind: str, simulation: Path | None = None) -> TelemetryBackend:
+def build_backend(
+    kind: str, simulation: Path | None = None, tracer_provider: TracerProvider | None = None
+) -> TelemetryBackend:
     if kind == "simulated":
         from opspilot_mcp.backends.simulated import SimulatedBackend, SimulationSpec
 
@@ -28,7 +33,7 @@ def build_backend(kind: str, simulation: Path | None = None) -> TelemetryBackend
         return SimulatedBackend(spec)
     from opspilot_mcp.backends.live import LiveBackend
 
-    return LiveBackend()
+    return LiveBackend(tracer_provider=tracer_provider)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -46,13 +51,20 @@ def main(argv: list[str] | None = None) -> None:
 
     # stdout carries the MCP protocol on stdio; diagnostics go to stderr only.
     logging.basicConfig(level=logging.WARNING)
-    server = build_server(build_backend(args.backend, args.simulation))
-    if args.transport == "streamable-http":
-        server.settings.host = args.host
-        server.settings.port = args.port
-        server.run("streamable-http")
-    else:
-        server.run("stdio")
+    tracer_provider = configure("opspilot-mcp")
+    backend = build_backend(args.backend, args.simulation, tracer_provider)
+    server = build_server(backend, tracer_provider=tracer_provider)
+    try:
+        if args.transport == "streamable-http":
+            server.settings.host = args.host
+            server.settings.port = args.port
+            server.run("streamable-http")
+        else:
+            server.run("stdio")
+    finally:
+        # A stdio server is stopped by its client closing stdin, and the client only waits a
+        # moment for it to exit: export whatever spans are still buffered before then.
+        tracer_provider.shutdown()
 
 
 if __name__ == "__main__":
