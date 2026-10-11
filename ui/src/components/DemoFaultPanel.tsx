@@ -1,5 +1,6 @@
 "use client";
 
+import { CheckCircle2, CircleAlert } from "lucide-react";
 import { useId, useState, type FormEvent } from "react";
 import useSWR from "swr";
 
@@ -31,14 +32,14 @@ export function DemoFaultPanel() {
   const { data: config } = useConfig();
   if (!config) {
     return (
-      <Panel title="Demo: inject a fault" intro={INTRO}>
+      <Panel title="Demo: inject a fault" intro={INTRO} variant="harness">
         <Skeleton width="80%" />
       </Panel>
     );
   }
   if (!config.demo_enabled) {
     return (
-      <Panel title="Demo: inject a fault" intro={INTRO}>
+      <Panel title="Demo: inject a fault" intro={INTRO} variant="harness">
         <Notice>
           <p>
             Fault injection is off. Set <code>OPSPILOT_CHAOS_URL</code> on the agent API to the
@@ -117,9 +118,10 @@ function DemoControls() {
 
   if (catalog.error) {
     return (
-      <Panel title="Demo: inject a fault" intro={INTRO}>
+      <Panel title="Demo: inject a fault" intro={INTRO} variant="harness">
         <Notice tone="danger" role="alert">
           <p>Could not load the fault catalog: {catalog.error.message}</p>
+          <p>Check that the control plane is running (make up) and reload this page.</p>
         </Notice>
       </Panel>
     );
@@ -127,7 +129,7 @@ function DemoControls() {
 
   const records = [...(faults.data?.faults ?? [])].reverse();
   return (
-    <Panel title="Demo: inject a fault" intro={INTRO}>
+    <Panel title="Demo: inject a fault" intro={INTRO} variant="harness">
       {!selected ? (
         <Skeleton width="80%" />
       ) : (
@@ -138,6 +140,7 @@ function DemoControls() {
             </label>
             <select
               id={`${ids}-type`}
+              name="type"
               className={uiStyles.input}
               value={selected.type}
               onChange={(event) => {
@@ -162,6 +165,7 @@ function DemoControls() {
             </label>
             <select
               id={`${ids}-target`}
+              name="target"
               className={uiStyles.input}
               value={effectiveTarget}
               onChange={(event) => setTarget(event.target.value)}
@@ -180,6 +184,8 @@ function DemoControls() {
               </label>
               <input
                 id={`${ids}-${name}`}
+                name={name}
+                autoComplete="off"
                 className={uiStyles.input}
                 type="number"
                 step={paramStep(schema)}
@@ -200,7 +206,8 @@ function DemoControls() {
               onClick={() =>
                 void run(async () => {
                   const result = await api.resetDemo();
-                  return `Demo system reset; ${result.resolved_faults} active fault(s) cleared.`;
+                  const n = result.resolved_faults;
+                  return `Demo system reset: ${n} active ${n === 1 ? "fault" : "faults"} cleared.`;
                 })
               }
             >
@@ -268,7 +275,10 @@ function FaultRow({
       </div>
       {record.active ? (
         <div className={styles.faultState}>
-          <span className={styles.activeLabel}>Active</span>
+          <span className={styles.activeLabel}>
+            <CircleAlert size={14} aria-hidden="true" />
+            Active
+          </span>
           <Button
             variant="quiet"
             onClick={onClear}
@@ -280,6 +290,7 @@ function FaultRow({
         </div>
       ) : (
         <p className={styles.resolved}>
+          <CheckCircle2 size={14} aria-hidden="true" className={styles.resolvedIcon} />
           {RESOLVED_BY[record.resolved_by ?? ""] ?? "Resolved"}
           {record.resolved_at ? ` at ${clockTime(record.resolved_at)}` : ""}
         </p>

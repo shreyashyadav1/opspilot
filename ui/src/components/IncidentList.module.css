@@ -1,19 +1,20 @@
 .groups {
   display: grid;
-  gap: var(--space-6);
+  gap: var(--space-7);
+  min-width: 0;
 }
 
 .groupTitle {
   display: flex;
   align-items: baseline;
   gap: var(--space-2);
-  font-size: var(--text-base);
+  font-size: var(--text-lg);
   margin-bottom: var(--space-3);
 }
 
 .count {
-  font-size: var(--text-xs);
-  font-weight: 600;
+  font-size: var(--text-sm);
+  font-weight: 400;
   color: var(--ink-3);
   font-variant-numeric: tabular-nums;
 }
@@ -21,7 +22,7 @@
 .head,
 .row {
   display: grid;
-  grid-template-columns: 150px minmax(0, 1fr) 200px 96px;
+  grid-template-columns: 158px minmax(0, 1fr) 190px 92px;
   gap: var(--space-4);
   align-items: start;
 }
@@ -30,7 +31,7 @@
   padding: 0 var(--space-4) var(--space-2);
   font-size: var(--text-xs);
   color: var(--ink-3);
-  font-weight: 600;
+  border-bottom: 1px solid var(--rule);
 }
 
 .headTime {
@@ -41,27 +42,34 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  background: var(--surface);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-panel);
+  display: grid;
 }
 
 .row {
   position: relative;
   padding: var(--space-4);
-  border-top: 1px solid var(--rule);
-}
-
-.row:first-child {
-  border-top: 0;
+  border-bottom: 1px solid var(--rule);
+  transition: background-color var(--dur-state) ease;
 }
 
 .row:hover {
-  background: var(--surface-sunk);
+  background: var(--panel);
 }
 
+/* Waiting on a person: the agent's proposal, framed in its intent color. */
 .pending {
-  box-shadow: inset 4px 0 0 var(--gate-bar);
+  background: var(--intent-fill);
+  border: 1px solid var(--intent);
+  border-radius: var(--radius-l);
+}
+
+.pending + .pending {
+  margin-top: var(--space-3);
+}
+
+.pending:hover {
+  background: var(--intent-fill);
+  border-color: var(--ink-2);
 }
 
 .alert {
@@ -69,8 +77,9 @@
 }
 
 .link {
-  font-weight: 650;
+  font-weight: 700;
   text-decoration: none;
+  overflow-wrap: anywhere;
 }
 
 /* The whole row is clickable; the link stays the one focusable, announced element. */
@@ -78,6 +87,7 @@
   content: "";
   position: absolute;
   inset: 0;
+  border-radius: inherit;
 }
 
 .link:hover {
@@ -89,8 +99,8 @@
 }
 
 .link:focus-visible::after {
-  outline: 3px solid var(--focus);
-  outline-offset: -3px;
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
 }
 
 .meta {
@@ -98,20 +108,34 @@
   font-size: var(--text-xs);
   color: var(--ink-3);
   display: flex;
-  gap: var(--space-3);
+  flex-wrap: wrap;
+  gap: 0 var(--space-3);
+}
+
+.pending .meta {
+  color: var(--ink-2);
 }
 
 .id {
-  font-variant-numeric: tabular-nums;
+  font-family: var(--font-code);
+}
+
+.proposal {
+  grid-column: 2 / 4;
+  margin-top: calc(var(--space-2) * -1);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--intent);
 }
 
 .cause {
   display: grid;
   font-size: var(--text-sm);
+  min-width: 0;
 }
 
 .service {
-  font-weight: 650;
+  font-weight: 700;
 }
 
 .category {
@@ -133,8 +157,8 @@
   display: grid;
   gap: var(--space-4);
   padding: var(--space-5);
-  background: var(--surface);
   border: 1px solid var(--rule);
+  border-radius: var(--radius-l);
 }
 
 @media (max-width: 760px) {
@@ -147,8 +171,10 @@
     grid-template-areas:
       "status time"
       "alert alert"
+      "proposal proposal"
       "cause cause";
     gap: var(--space-2);
+    padding: var(--space-4) var(--space-3);
   }
 
   .status {
@@ -162,10 +188,16 @@
   .cause {
     grid-area: cause;
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-2);
   }
 
   .time {
     grid-area: time;
+  }
+
+  .proposal {
+    grid-area: proposal;
+    margin-top: 0;
   }
 }
