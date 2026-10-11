@@ -9,6 +9,8 @@ import type {
 const at = (seconds: number) =>
   new Date(Date.UTC(2026, 8, 28, 21, 4, 12) + seconds * 1000).toISOString();
 
+export const TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736";
+
 export const PLAYBOOK = {
   spec: "fake:playbook",
   kind: "baseline" as const,
@@ -157,6 +159,7 @@ export function investigation(overrides: Partial<InvestigationDetail> = {}): Inv
     time_to_diagnosis_s: 1,
     error: null,
     trace: pendingTrace(),
+    trace_id: TRACE_ID,
     ...overrides,
   };
 }
