@@ -33,7 +33,7 @@ function metrics(s: BenchmarkSummary): MetricRow[] {
     {
       label: "Action accuracy",
       value: percent(s.action_accuracy),
-      definition: "The proposed action type and target match the scenario's expected action.",
+      definition: "The proposed action type and target match the scenario’s expected action.",
     },
     {
       label: "Tool-call precision",
@@ -44,7 +44,7 @@ function metrics(s: BenchmarkSummary): MetricRow[] {
     {
       label: "Evidence recall",
       value: percent(s.evidence_recall),
-      definition: "Share of the scenario's required observations the agent collected.",
+      definition: "Share of the scenario’s required observations the agent collected.",
     },
     {
       label: "Steps and tool calls",

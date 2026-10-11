@@ -147,7 +147,7 @@ export function StartInvestigationForm() {
               name="firing_minutes"
               className={uiStyles.input}
               inputMode="numeric"
-              placeholder="Optional"
+              placeholder="e.g. 15"
               autoComplete="off"
               value={firing}
               onChange={(event) => setFiring(event.target.value)}

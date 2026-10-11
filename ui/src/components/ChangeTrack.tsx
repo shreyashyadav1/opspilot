@@ -144,8 +144,8 @@ export function ChangeTrack({
 
       {!plan.confirmed && (plan.sourceSeq === null || callNumber === null) ? (
         <p className={styles.source}>
-          The agent&apos;s tool calls did not report the versions; the rollback returns to the
-          version before the one running.
+          The agent’s tool calls did not report the versions; the rollback returns to the version
+          before the one running.
         </p>
       ) : null}
     </div>

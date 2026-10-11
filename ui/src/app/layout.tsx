@@ -10,7 +10,7 @@ import styles from "./layout.module.css";
 export const metadata: Metadata = {
   title: { default: "OpsPilot", template: "%s | OpsPilot" },
   description:
-    "Review the on-call agent's investigations, approve or reject its proposed actions, and browse benchmark results.",
+    "Review the on-call agent’s investigations, approve or reject its proposed actions, and browse benchmark results.",
   applicationName: "OpsPilot",
 };
 

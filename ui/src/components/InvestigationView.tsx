@@ -92,7 +92,7 @@ export function InvestigationView({ investigationId }: { investigationId: string
               </time>
             </dd>
           </div>
-          <div>
+          <div className={styles.wide}>
             <dt>Model</dt>
             <dd className={styles.model}>
               {data.model.label} <ModelBadge model={data.model} />
@@ -103,7 +103,7 @@ export function InvestigationView({ investigationId }: { investigationId: string
             <dd className={styles.code}>{data.id}</dd>
           </div>
           {data.trace_id ? (
-            <div className={styles.trace}>
+            <div className={styles.wide}>
               <dt>Trace</dt>
               <dd className={styles.traceValue}>
                 <code title="Look this up in the trace backend">{data.trace_id}</code>
