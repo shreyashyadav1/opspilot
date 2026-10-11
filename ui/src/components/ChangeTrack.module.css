@@ -134,7 +134,15 @@
 }
 
 .citation a {
+  position: relative;
   color: var(--ink-2);
+}
+
+/* A 24px-plus hit area around a small caption link. */
+.citation a::after {
+  content: "";
+  position: absolute;
+  inset: -8px -4px;
 }
 
 /* States */

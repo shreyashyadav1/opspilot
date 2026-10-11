@@ -382,8 +382,15 @@
 }
 
 .gate .meta a {
+  position: relative;
   font-weight: 700;
   color: var(--ink);
+}
+
+.gate .meta a::after {
+  content: "";
+  position: absolute;
+  inset: -6px -4px;
 }
 
 /* What waits behind the gate: drawn, but not yet (or never) taken. */
