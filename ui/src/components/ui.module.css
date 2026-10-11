@@ -14,17 +14,17 @@
   text-decoration: none;
   cursor: pointer;
   transition:
-    background-color var(--dur-state) ease,
-    border-color var(--dur-state) ease,
-    color var(--dur-state) ease;
+    background-color var(--dur-hover) ease,
+    border-color var(--dur-hover) ease,
+    color var(--dur-hover) ease;
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .button {
     transition:
-      background-color var(--dur-state) ease,
-      border-color var(--dur-state) ease,
-      color var(--dur-state) ease,
+      background-color var(--dur-hover) ease,
+      border-color var(--dur-hover) ease,
+      color var(--dur-hover) ease,
       transform var(--dur-press) var(--ease-out);
   }
 
@@ -131,7 +131,7 @@
   color: var(--ink);
   border: 1px solid var(--rule-strong);
   border-radius: var(--radius-m);
-  transition: border-color var(--dur-state) ease;
+  transition: border-color var(--dur-hover) ease;
 }
 
 .input::placeholder {

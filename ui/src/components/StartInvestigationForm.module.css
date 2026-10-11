@@ -29,9 +29,9 @@
   cursor: pointer;
   text-align: left;
   transition:
-    color var(--dur-state) ease,
-    border-color var(--dur-state) ease,
-    background-color var(--dur-state) ease;
+    color var(--dur-hover) ease,
+    border-color var(--dur-hover) ease,
+    background-color var(--dur-hover) ease;
 }
 
 .preset:hover {
