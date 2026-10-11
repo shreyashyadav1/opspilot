@@ -43,7 +43,7 @@
 
 .lede {
   color: var(--ink-2);
-  max-width: 64ch;
+  max-width: var(--measure);
 }
 
 .runs {
@@ -59,7 +59,6 @@
   gap: var(--space-2);
   padding: var(--space-5) var(--space-4);
   border-bottom: 1px solid var(--rule);
-  transition: background-color var(--dur-state) ease;
 }
 
 .run:first-child {
@@ -107,7 +106,7 @@
 .note {
   font-size: var(--text-sm);
   color: var(--ink-2);
-  max-width: 72ch;
+  max-width: var(--measure);
 }
 
 .env {
@@ -209,6 +208,7 @@
 .definition {
   color: var(--ink-2);
   min-width: 260px;
+  max-width: 50ch;
 }
 
 .yes,

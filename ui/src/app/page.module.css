@@ -15,7 +15,7 @@
 
 .intro p {
   color: var(--ink-2);
-  max-width: 64ch;
+  max-width: var(--measure);
 }
 
 .columns {

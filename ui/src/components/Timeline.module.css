@@ -124,6 +124,7 @@
   margin-top: 2px;
   font-size: var(--text-sm);
   color: var(--ink-2);
+  max-width: var(--measure);
   overflow-wrap: anywhere;
 }
 
@@ -134,7 +135,7 @@
   background: var(--panel);
   border-radius: var(--radius-m);
   font-size: var(--text-sm);
-  max-width: 72ch;
+  max-width: var(--measure);
 }
 
 /* Tool calls: numbered rows on a sunk ground, the evidence trail the diagnosis cites. */
@@ -149,6 +150,7 @@
 }
 
 .call {
+  position: relative;
   display: grid;
   grid-template-columns: 26px minmax(0, 1fr);
   gap: var(--space-3);
@@ -230,6 +232,7 @@
   margin-top: 2px;
   font-size: var(--text-sm);
   color: var(--ink-2);
+  max-width: var(--measure);
   overflow-wrap: anywhere;
 }
 
@@ -280,15 +283,28 @@
   }
 }
 
-/* A step that arrived while the page was open: a brief raised ground, then gone. */
-.entry[data-fresh],
-.call[data-fresh] {
+/* A step that arrived while the page was open: a brief raised ground behind it, then gone. */
+.entry,
+.call {
+  isolation: isolate;
+}
+
+.entry[data-fresh]::after,
+.call[data-fresh]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: var(--radius-m);
+  background: var(--panel-2);
+  opacity: 0;
+  pointer-events: none;
   animation: arrived 1.2s var(--ease-out);
 }
 
 @keyframes arrived {
   from {
-    background-color: var(--panel-2);
+    opacity: 1;
   }
 }
 

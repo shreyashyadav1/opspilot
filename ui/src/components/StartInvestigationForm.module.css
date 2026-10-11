@@ -20,7 +20,7 @@
 /* Common alerts, one tap away. */
 .preset {
   min-height: 32px;
-  padding: 0 var(--space-3);
+  padding: var(--space-1) var(--space-3);
   border: 1px solid var(--rule-strong);
   border-radius: var(--radius-s);
   background: transparent;

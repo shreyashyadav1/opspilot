@@ -49,7 +49,6 @@
   position: relative;
   padding: var(--space-4);
   border-bottom: 1px solid var(--rule);
-  transition: background-color var(--dur-state) ease;
 }
 
 .row:hover {

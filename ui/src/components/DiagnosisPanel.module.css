@@ -56,7 +56,7 @@
 }
 
 .summary {
-  max-width: 68ch;
+  max-width: var(--measure);
 }
 
 .subhead {
@@ -131,6 +131,7 @@
 .stats {
   font-size: var(--text-xs);
   color: var(--ink-3);
+  max-width: var(--measure);
 }
 
 .working {

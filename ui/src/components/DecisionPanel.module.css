@@ -12,6 +12,11 @@
   transition: border-color var(--dur-state) ease;
 }
 
+.panel {
+  scroll-margin-top: var(--space-4);
+}
+
+/* Focused only as a jump target from the timeline; the outcome inside takes a visible ring. */
 .panel:focus {
   outline: none;
 }
@@ -104,7 +109,7 @@
 .explain {
   font-size: var(--text-sm);
   color: var(--ink-2);
-  max-width: 60ch;
+  max-width: var(--measure);
 }
 
 /* Who decides, and an optional note, side by side: the buttons stay close to the change. */
