@@ -372,12 +372,13 @@ connection to a trace backend, so tests and CI need none. Exporting sends OTLP/H
 all-in-one container (in-memory storage, UI on `:8166`) on the `dashboard` and `tracing`
 profiles.
 
-**Cost per incident.** Token usage is already tracked per investigation (`Usage` in the agent
-API, `ScenarioScore` in the benchmark); both now also carry `cost_usd`, computed from
-`evals/pricing.yaml` (USD per million input/output tokens) by the model in use. A model absent
-from that file prices as `null` (unknown), never a guess; `fake:playbook` prices at zero, and
-reports a real zero token count rather than the character-based estimate used only to drive the
-fakes in unit tests, so its zero cost is not a tracking gap wearing a number.
+**Cost per incident.** Token usage is tracked per investigation (`Usage` in the agent API,
+`ScenarioScore` in the benchmark). The benchmark already priced its runs from
+`evals/pricing.yaml` (USD per million input/output tokens); the agent API now prices each
+investigation from the same file (`usage.cost_usd`), by the model in use. A model absent from
+that file prices as `null` (unknown), never a guess; `fake:playbook` prices at zero and reports
+a real zero token count rather than the character-based estimate used only to drive the fakes in
+unit tests, so its zero cost is not a tracking gap wearing a number.
 
 ## 4. Data flow for one incident
 
