@@ -13,8 +13,8 @@ from dotenv import load_dotenv
 from langchain_core.language_models import BaseChatModel
 from pydantic import SecretStr
 
-# Groq retired llama-3.3-70b-versatile on 2026-08-16; gpt-oss-120b is its recommended
-# replacement (https://console.groq.com/docs/deprecations).
+# Groq shut down llama-3.3-70b-versatile for free and developer tiers on 2026-08-16;
+# gpt-oss-120b is its recommended replacement (https://console.groq.com/docs/deprecations).
 DEFAULT_MODEL = "groq:openai/gpt-oss-120b"
 # gpt-oss-120b is a reasoning model: its reasoning tokens are billed and counted against
 # max_tokens just like the visible answer, so a request can be cut off before it ever reaches

@@ -3,8 +3,8 @@
 # are reported with an unknown cost.
 #
 # groq:openai/gpt-oss-120b: $0.15 / $0.60 per million input/output tokens, from Groq's own model
-# page (https://console.groq.com/docs/model/openai/gpt-oss-120b), checked 2026-09. Replaces
-# groq:llama-3.3-70b-versatile, which Groq retired on 2026-08-16
+# page (https://console.groq.com/docs/model/openai/gpt-oss-120b), checked 2026-10-10. Replaces
+# groq:llama-3.3-70b-versatile, which Groq shut down for free and developer tiers on 2026-08-16
 # (https://console.groq.com/docs/deprecations).
 groq:openai/gpt-oss-120b:
   input: 0.15
