@@ -1,34 +1,39 @@
 import type { Status } from "./types";
 
-export type Tone = "active" | "attention" | "success" | "info" | "neutral" | "danger";
+/**
+ * Status tones. Color is state: "awaiting" (the agent's proposal held at the gate), "healthy",
+ * "degraded" and "failing", plus "active" (work in progress) and "neutral" (settled, nothing to
+ * do). Every tone is shown with a text label and its own glyph, never by color alone.
+ */
+export type Tone = "active" | "awaiting" | "healthy" | "degraded" | "failing" | "neutral";
 
 export const STATUS: Record<Status, { label: string; tone: Tone; hint: string }> = {
   queued: { label: "Queued", tone: "active", hint: "Waiting for a free investigation slot." },
   running: { label: "Investigating", tone: "active", hint: "The agent is calling tools." },
   awaiting_approval: {
     label: "Needs approval",
-    tone: "attention",
+    tone: "awaiting",
     hint: "The proposed action runs only after someone approves it.",
   },
   executing: { label: "Executing", tone: "active", hint: "The approved action is running." },
-  executed: { label: "Executed", tone: "success", hint: "The approved action ran." },
+  executed: { label: "Executed", tone: "healthy", hint: "The approved action ran." },
   action_failed: {
     label: "Execution failed",
-    tone: "danger",
+    tone: "failing",
     hint: "The approved action was attempted and failed.",
   },
   rejected: { label: "Rejected", tone: "neutral", hint: "The proposed action was not executed." },
   advisory: {
     label: "Diagnosed",
-    tone: "info",
+    tone: "neutral",
     hint: "Diagnosis with a recommendation for the operator.",
   },
   no_diagnosis: {
     label: "No diagnosis",
-    tone: "danger",
+    tone: "degraded",
     hint: "The agent ran out of turns without a valid diagnosis.",
   },
-  failed: { label: "Error", tone: "danger", hint: "The investigation stopped with an error." },
+  failed: { label: "Error", tone: "failing", hint: "The investigation stopped with an error." },
 };
 
 const CATEGORY: Record<string, string> = {
@@ -54,6 +59,13 @@ const FAULT: Record<string, string> = {
   dependency_outage: "Dependency outage",
 };
 
+const SOURCE: Record<string, string> = {
+  logs: "Logs",
+  metrics: "Metrics",
+  deploys: "Deploys",
+  health: "Health",
+};
+
 export const categoryLabel = (value: string | null | undefined): string =>
   value ? (CATEGORY[value] ?? value.replaceAll("_", " ")) : "Unknown";
 
@@ -61,6 +73,8 @@ export const actionLabel = (value: string | null | undefined): string =>
   value ? (ACTION[value] ?? value.replaceAll("_", " ")) : "None";
 
 export const faultLabel = (value: string): string => FAULT[value] ?? value.replaceAll("_", " ");
+
+export const sourceLabel = (value: string): string => SOURCE[value] ?? value;
 
 export function percent(value: number | null | undefined, digits = 0): string {
   if (value === null || value === undefined || Number.isNaN(value)) return "n/a";
@@ -115,6 +129,16 @@ export function offset(fromIso: string, toIso: string): string {
   if (seconds < 10) return `+${seconds.toFixed(1)} s`;
   if (seconds < 120) return `+${Math.round(seconds)} s`;
   return `+${Math.round(seconds / 60)} min`;
+}
+
+/** How long before `laterIso` something happened: "4 min before", "2 h before", or null if after. */
+export function leadTime(earlierIso: string, laterIso: string): string | null {
+  const seconds = (new Date(laterIso).getTime() - new Date(earlierIso).getTime()) / 1000;
+  if (!Number.isFinite(seconds) || seconds < 0) return null;
+  if (seconds < 60) return "less than a minute before";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 120) return `${minutes} min before`;
+  return `${Math.round(minutes / 60)} h before`;
 }
 
 export function formatArg(value: unknown): string {

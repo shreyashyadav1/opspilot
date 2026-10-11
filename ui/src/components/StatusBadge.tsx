@@ -7,7 +7,6 @@ import {
   Lightbulb,
   LoaderCircle,
   OctagonX,
-  PlayCircle,
   type LucideIcon,
 } from "lucide-react";
 
@@ -17,10 +16,11 @@ import type { Status } from "@/lib/types";
 import { GateMark } from "./GateMark";
 import styles from "./StatusBadge.module.css";
 
+// One glyph per status, so the state reads without color too.
 const ICONS: Record<Exclude<Status, "awaiting_approval">, LucideIcon> = {
   queued: Clock,
   running: LoaderCircle,
-  executing: PlayCircle,
+  executing: LoaderCircle,
   executed: CheckCircle2,
   action_failed: OctagonX,
   rejected: Ban,

@@ -1,4 +1,4 @@
-import { AlertTriangle, Info } from "lucide-react";
+import { AlertTriangle, Info, OctagonAlert } from "lucide-react";
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
 
 import styles from "./ui.module.css";
@@ -29,6 +29,7 @@ export function Panel({
   intro,
   action,
   headingLevel = 2,
+  variant = "default",
   className,
   children,
   ...rest
@@ -37,12 +38,15 @@ export function Panel({
   intro?: ReactNode;
   action?: ReactNode;
   headingLevel?: 2 | 3;
+  /** "harness" marks tools that stage the demo rather than operate it. */
+  variant?: "default" | "harness";
   className?: string;
   children: ReactNode;
 } & Omit<HTMLAttributes<HTMLElement>, "title">) {
   const Heading = headingLevel === 2 ? "h2" : "h3";
+  const classes = [styles.panel, variant === "harness" ? styles.harness : "", className ?? ""];
   return (
-    <section className={[styles.panel, className ?? ""].join(" ").trim()} {...rest}>
+    <section className={classes.join(" ").trim()} {...rest}>
       {title ? (
         <div className={styles.panelHeader}>
           <div>
@@ -57,6 +61,8 @@ export function Panel({
   );
 }
 
+const NOTICE_ICONS = { info: Info, danger: OctagonAlert, attention: AlertTriangle };
+
 export function Notice({
   tone = "info",
   children,
@@ -66,19 +72,28 @@ export function Notice({
   children: ReactNode;
   role?: "alert" | "status";
 }) {
-  const Icon = tone === "info" ? Info : AlertTriangle;
+  const Icon = NOTICE_ICONS[tone];
   return (
     <div className={`${styles.notice} ${styles[tone]}`} role={role}>
-      <Icon size={16} aria-hidden="true" />
+      <Icon size={18} aria-hidden="true" className={styles.noticeIcon} />
       <div className={styles.noticeBody}>{children}</div>
     </div>
   );
 }
 
-export function EmptyState({ title, children }: { title: string; children: ReactNode }) {
+export function EmptyState({
+  title,
+  headingLevel = 2,
+  children,
+}: {
+  title: string;
+  headingLevel?: 1 | 2 | 3;
+  children: ReactNode;
+}) {
+  const Heading = `h${headingLevel}` as const;
   return (
     <div className={styles.empty}>
-      <h3>{title}</h3>
+      <Heading className={styles.emptyTitle}>{title}</Heading>
       {children}
     </div>
   );

@@ -1,4 +1,8 @@
-/** Two posts and a barrier: the approval gate the whole product is built around. */
+/**
+ * Two posts and a barrier: the approval gate the whole product is built around. The barrier takes
+ * the intent color (the agent's proposal, held) unless a context overrides --gate-bar; contexts
+ * can also move it through [data-part="bar"], for example to show the gate opened.
+ */
 export function GateMark({ className }: { className?: string }) {
   return (
     <svg
@@ -11,7 +15,9 @@ export function GateMark({ className }: { className?: string }) {
     >
       <rect x="3" y="3" width="3" height="18" rx="1" fill="currentColor" />
       <rect x="18" y="3" width="3" height="18" rx="1" fill="currentColor" />
-      <rect x="6" y="10" width="12" height="4" fill="var(--gate-bar)" />
+      <g data-part="bar">
+        <rect x="6" y="10" width="12" height="4" fill="var(--gate-bar, var(--intent))" />
+      </g>
     </svg>
   );
 }

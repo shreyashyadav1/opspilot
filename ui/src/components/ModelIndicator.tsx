@@ -13,7 +13,7 @@ export function ModelIndicator() {
     return (
       <p className={styles.model} role="status">
         <AlertTriangle size={16} aria-hidden="true" className={styles.warn} />
-        <span>Agent API unreachable</span>
+        <span>Agent API unreachable. Start it with make api-dev.</span>
       </p>
     );
   }
