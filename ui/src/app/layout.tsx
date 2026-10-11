@@ -11,13 +11,13 @@ export const metadata: Metadata = {
   title: { default: "OpsPilot", template: "%s | OpsPilot" },
   description:
     "Review the on-call agent's investigations, approve or reject its proposed actions, and browse benchmark results.",
+  applicationName: "OpsPilot",
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#172230" },
-  ],
+  // The page background (--night): the dashboard is dark only.
+  themeColor: "#1a1618",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

@@ -1,7 +1,7 @@
 .main {
   max-width: var(--page-width);
   margin: 0 auto;
-  padding: var(--space-6) var(--gutter) var(--space-7);
+  padding: var(--space-5) var(--gutter) var(--space-8);
 }
 
 .main:focus {
@@ -12,12 +12,13 @@
   position: absolute;
   left: var(--space-3);
   top: -100px;
-  z-index: 10;
+  z-index: var(--z-skip);
   padding: var(--space-2) var(--space-3);
   background: var(--button-fill);
   color: var(--button-ink);
-  border-radius: var(--radius-control);
-  font-weight: 600;
+  border-radius: var(--radius-m);
+  font-weight: 700;
+  text-decoration: none;
 }
 
 .skip:focus {
