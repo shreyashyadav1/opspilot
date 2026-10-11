@@ -7,7 +7,9 @@ import { useSWRConfig } from "swr";
 
 import { clockTime, dateTime } from "@/lib/format";
 import { useInvestigation } from "@/lib/hooks";
+import { gateState } from "@/lib/timeline";
 
+import { CopyButton } from "./CopyButton";
 import { DecisionPanel } from "./DecisionPanel";
 import { DiagnosisPanel } from "./DiagnosisPanel";
 import { ModelBadge } from "./ModelBadge";
@@ -36,11 +38,19 @@ export function InvestigationView({ investigationId }: { investigationId: string
         <BackLink />
         {error ? (
           <Notice tone="danger" role="alert">
-            <p>
-              {error.status === 404
-                ? `There is no investigation ${investigationId}.`
-                : `Could not load ${investigationId}: ${error.message}`}
-            </p>
+            {error.status === 404 ? (
+              <p>
+                There is no investigation {investigationId}. It may belong to another agent API;
+                pick one from the incident list.
+              </p>
+            ) : (
+              <>
+                <p>
+                  Could not load {investigationId}: {error.message}
+                </p>
+                <p>Check that the agent API is running (make api-dev), then reload this page.</p>
+              </>
+            )}
           </Notice>
         ) : (
           <div className={styles.loading} aria-busy="true" aria-label="Loading investigation">
@@ -51,6 +61,11 @@ export function InvestigationView({ investigationId }: { investigationId: string
       </div>
     );
   }
+
+  // When an action is held at (or went through) the approval gate, the decision takes the
+  // right-hand column and the diagnosis heads the evidence trail; otherwise the diagnosis is the
+  // verdict.
+  const decided = Boolean(data.approval_request && gateState(data));
 
   return (
     <div className={styles.page}>
@@ -85,13 +100,14 @@ export function InvestigationView({ investigationId }: { investigationId: string
           </div>
           <div>
             <dt>ID</dt>
-            <dd className="numeric">{data.id}</dd>
+            <dd className={styles.code}>{data.id}</dd>
           </div>
           {data.trace_id ? (
-            <div>
+            <div className={styles.trace}>
               <dt>Trace</dt>
-              <dd className={`numeric ${styles.traceId}`} title="Look this up in the trace backend">
-                {data.trace_id}
+              <dd className={styles.traceValue}>
+                <code title="Look this up in the trace backend">{data.trace_id}</code>
+                <CopyButton value={data.trace_id} label="Copy the trace id" />
               </dd>
             </div>
           ) : null}
@@ -104,12 +120,22 @@ export function InvestigationView({ investigationId }: { investigationId: string
         ) : null}
       </header>
 
-      <div className={styles.columns}>
-        <div className={styles.side}>
-          <DecisionPanel investigation={data} onDecided={accept} />
-          <DiagnosisPanel investigation={data} />
-        </div>
-        <div className={styles.main}>
+      <div className={`${styles.columns} ${decided ? styles.withDecision : styles.withVerdict}`}>
+        {decided ? (
+          <>
+            <div className={styles.side}>
+              <DecisionPanel investigation={data} onDecided={accept} />
+            </div>
+            <div className={styles.diagnosis}>
+              <DiagnosisPanel investigation={data} />
+            </div>
+          </>
+        ) : (
+          <div className={`${styles.side} ${styles.verdict}`}>
+            <DiagnosisPanel investigation={data} />
+          </div>
+        )}
+        <div className={styles.trail}>
           <Timeline investigation={data} />
         </div>
       </div>
