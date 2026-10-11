@@ -111,8 +111,9 @@
 }
 
 /*
- * One column on small screens, in reading order: the decision (or the verdict), the diagnosis,
- * then the trail. On wide screens the decision sits beside the evidence it rests on.
+ * One column on small screens, in reading order: the diagnosis, the next step (the decision, when
+ * one is held), then the trail. On wide screens the next step sits beside the diagnosis and the
+ * evidence it rests on, and stays in view while the trail scrolls.
  */
 .columns {
   display: grid;
@@ -127,28 +128,18 @@
   min-width: 0;
 }
 
-.verdict {
-  padding: var(--space-5);
-  background: var(--panel);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-l);
-}
-
 @media (min-width: 1080px) {
   .columns {
-    column-gap: var(--space-7);
-  }
-
-  .withDecision {
     grid-template-columns: minmax(0, 1fr) 460px;
     grid-template-rows: auto 1fr;
     grid-template-areas:
       "diagnosis side"
       "trail side";
+    column-gap: var(--space-7);
   }
 
-  .withVerdict {
-    grid-template-columns: minmax(0, 1fr) 400px;
+  .noDiagnosis {
+    grid-template-rows: 1fr;
     grid-template-areas: "trail side";
   }
 
@@ -165,13 +156,19 @@
   }
 }
 
-/* Keep the decision in view while reading the trail, when the screen is tall enough for all
+/* Keep the next step in view while reading the trail, when the screen is tall enough for all
    of it; a sticky panel taller than the viewport would hide its own buttons. */
 @media (min-width: 1080px) and (min-height: 760px) {
   .side {
     position: sticky;
     top: var(--space-4);
   }
+}
+
+/* The status, when a decision is waiting, doubles as a jump to it. */
+.badgeLink {
+  border-radius: var(--radius-s);
+  text-decoration: none;
 }
 
 .loading {

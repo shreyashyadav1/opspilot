@@ -2,10 +2,10 @@
 
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSWRConfig } from "swr";
 
-import { clockTime, dateTime } from "@/lib/format";
+import { STATUS, clockTime, dateTime } from "@/lib/format";
 import { useInvestigation } from "@/lib/hooks";
 import { gateState } from "@/lib/timeline";
 
@@ -13,6 +13,7 @@ import { CopyButton } from "./CopyButton";
 import { DecisionPanel } from "./DecisionPanel";
 import { DiagnosisPanel } from "./DiagnosisPanel";
 import { ModelBadge } from "./ModelBadge";
+import { NextStep } from "./NextStep";
 import { StatusBadge } from "./StatusBadge";
 import { Timeline } from "./Timeline";
 import { Notice, Skeleton } from "./ui";
@@ -22,6 +23,14 @@ export function InvestigationView({ investigationId }: { investigationId: string
   const { data, error, live, accept } = useInvestigation(investigationId);
   const { mutate } = useSWRConfig();
   const status = data?.status;
+
+  // Say a status change out loud when it happens while the page is open (not on first load).
+  const [seenStatus, setSeenStatus] = useState(status);
+  const [announcement, setAnnouncement] = useState("");
+  if (status !== seenStatus) {
+    setSeenStatus(status);
+    if (seenStatus && status) setAnnouncement(`${STATUS[status].label}. ${STATUS[status].hint}`);
+  }
 
   // Keep the incident list in step when this page sees a status change.
   useEffect(() => {
@@ -62,10 +71,12 @@ export function InvestigationView({ investigationId }: { investigationId: string
     );
   }
 
-  // When an action is held at (or went through) the approval gate, the decision takes the
-  // right-hand column and the diagnosis heads the evidence trail; otherwise the diagnosis is the
-  // verdict.
+  // The diagnosis always heads the evidence trail. The right-hand column holds the next step: the
+  // decision when an action is held at (or went through) the approval gate, otherwise what the
+  // agent is doing or recommends. Reading order is the same on every screen: diagnosis, next
+  // step, trail.
   const decided = Boolean(data.approval_request && gateState(data));
+  const pending = data.status === "awaiting_approval";
 
   return (
     <div className={styles.page}>
@@ -73,7 +84,14 @@ export function InvestigationView({ investigationId }: { investigationId: string
       <header className={styles.header}>
         <div className={styles.titleRow}>
           <h1>{data.alert.title}</h1>
-          <StatusBadge status={data.status} size="large" />
+          {pending ? (
+            <a href="#decision" className={styles.badgeLink}>
+              <StatusBadge status={data.status} size="large" />
+              <span className="visually-hidden">: go to the decision</span>
+            </a>
+          ) : (
+            <StatusBadge status={data.status} size="large" />
+          )}
         </div>
         <dl className={styles.facts}>
           <div>
@@ -124,21 +142,23 @@ export function InvestigationView({ investigationId }: { investigationId: string
         ) : null}
       </header>
 
-      <div className={`${styles.columns} ${decided ? styles.withDecision : styles.withVerdict}`}>
-        {decided ? (
-          <>
-            <div className={styles.side}>
-              <DecisionPanel investigation={data} onDecided={accept} />
-            </div>
-            <div className={styles.diagnosis}>
-              <DiagnosisPanel investigation={data} />
-            </div>
-          </>
-        ) : (
-          <div className={`${styles.side} ${styles.verdict}`}>
+      <p className="visually-hidden" aria-live="polite">
+        {announcement}
+      </p>
+
+      <div className={`${styles.columns} ${data.diagnosis ? "" : styles.noDiagnosis}`}>
+        {data.diagnosis ? (
+          <div className={styles.diagnosis}>
             <DiagnosisPanel investigation={data} />
           </div>
-        )}
+        ) : null}
+        <div className={styles.side}>
+          {decided ? (
+            <DecisionPanel investigation={data} onDecided={accept} />
+          ) : (
+            <NextStep investigation={data} />
+          )}
+        </div>
         <div className={styles.trail}>
           {/* Keyed so a different investigation starts with no "new" steps. */}
           <Timeline key={data.id} investigation={data} />

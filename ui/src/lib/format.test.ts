@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { categoryLabel, offset, percent, relativeTime, signature } from "./format";
+import { actionPhrase, categoryLabel, offset, percent, relativeTime, signature } from "./format";
 
 describe("format", () => {
   it("renders tool calls as function signatures", () => {
@@ -19,6 +19,12 @@ describe("format", () => {
     expect(relativeTime("2026-09-28T21:09:40Z", now)).toBe("just now");
     expect(relativeTime("2026-09-28T21:06:00Z", now)).toBe("4 min ago");
     expect(relativeTime("2026-09-28T18:10:00Z", now)).toBe("3 h ago");
+  });
+
+  it("states proposed actions in plain words", () => {
+    expect(actionPhrase("rollback_deploy", "orders")).toBe("Roll back the latest deploy of orders");
+    expect(actionPhrase("escalate", "payments")).toBe("Escalate to the team that owns payments");
+    expect(actionPhrase("drain_queue", "orders")).toBe("drain queue on orders");
   });
 
   it("labels categories and percentages", () => {

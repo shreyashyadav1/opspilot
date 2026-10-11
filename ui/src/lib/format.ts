@@ -75,6 +75,22 @@ export const actionLabel = (value: string | null | undefined): string =>
 
 export const faultLabel = (value: string): string => FAULT[value] ?? value.replaceAll("_", " ");
 
+/** A proposed action as one plain sentence fragment: "Roll back the latest deploy of orders". */
+export function actionPhrase(type: string, target: string): string {
+  switch (type) {
+    case "rollback_deploy":
+      return `Roll back the latest deploy of ${target}`;
+    case "restart_service":
+      return `Restart ${target}`;
+    case "escalate":
+      return `Escalate to the team that owns ${target}`;
+    case "none":
+      return `Take no action on ${target}`;
+    default:
+      return `${type.replaceAll("_", " ")} on ${target}`;
+  }
+}
+
 export const sourceLabel = (value: string): string => SOURCE[value] ?? value;
 
 export function percent(value: number | null | undefined, digits = 0): string {
@@ -102,6 +118,7 @@ export function clockTime(iso: string): string {
   });
 }
 
+/** A full date and time, with the time zone: on-call teams span them. */
 export function dateTime(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
     year: "numeric",
@@ -110,6 +127,7 @@ export function dateTime(iso: string): string {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
+    timeZoneName: "short",
   });
 }
 

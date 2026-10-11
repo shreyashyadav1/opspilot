@@ -1,10 +1,7 @@
-import { LoaderCircle } from "lucide-react";
-
-import { actionLabel, categoryLabel, money, percent, signature, sourceLabel } from "@/lib/format";
+import { categoryLabel, money, percent, signature, sourceLabel } from "@/lib/format";
 import { callAnchor, callNumbers, evidenceCall } from "@/lib/timeline";
 import type { InvestigationDetail } from "@/lib/types";
 
-import { Notice } from "./ui";
 import styles from "./DiagnosisPanel.module.css";
 
 /** The cost figure, with a note when it is zero because the model is a non-LLM baseline rather
@@ -22,54 +19,13 @@ function CostNote({ investigation }: { investigation: InvestigationDetail }) {
   return <>{money(usage.cost_usd)}</>;
 }
 
+/**
+ * What the agent concluded and the evidence it cited, each piece linked to the tool call it came
+ * from. It heads the evidence trail; what to do about it lives in the next-step column.
+ */
 export function DiagnosisPanel({ investigation }: { investigation: InvestigationDetail }) {
-  const { diagnosis, status, usage } = investigation;
-
-  if (!diagnosis) {
-    if (status === "running" || status === "queued") {
-      return (
-        <section className={styles.panel} aria-labelledby="diagnosis-title" aria-busy="true">
-          <h2 id="diagnosis-title">Diagnosis</h2>
-          <p className={styles.working}>
-            <LoaderCircle size={18} aria-hidden="true" className={styles.spin} />
-            {status === "queued" ? "Queued" : "Investigating"}
-          </p>
-          <dl className={styles.progress}>
-            <div>
-              <dt>Model turns</dt>
-              <dd className="numeric">{usage.turns}</dd>
-            </div>
-            <div>
-              <dt>Tool calls</dt>
-              <dd className="numeric">{usage.tool_calls}</dd>
-            </div>
-            <div>
-              <dt>Cost so far</dt>
-              <dd className="numeric">{money(usage.cost_usd)}</dd>
-            </div>
-          </dl>
-        </section>
-      );
-    }
-    return (
-      <section className={styles.panel} aria-labelledby="diagnosis-title">
-        <h2 id="diagnosis-title">Diagnosis</h2>
-        <Notice tone={status === "no_diagnosis" ? "attention" : "danger"}>
-          <p>
-            {status === "no_diagnosis"
-              ? "The agent used its turn budget without submitting a valid diagnosis."
-              : (investigation.error ?? "The investigation ended without a diagnosis.")}
-          </p>
-          <p>Read the timeline for what it found, or start a new investigation with more detail.</p>
-        </Notice>
-      </section>
-    );
-  }
-
-  const action = diagnosis.proposed_action;
-  const executable = investigation.proposed_action?.executable ?? false;
-  // A held action is described, and decided, in the decision panel.
-  const gated = investigation.approval_request !== null;
+  const { diagnosis, usage } = investigation;
+  if (!diagnosis) return null;
   const numbers = callNumbers(investigation.trace);
   return (
     <section className={styles.panel} aria-labelledby="diagnosis-title">
@@ -77,9 +33,6 @@ export function DiagnosisPanel({ investigation }: { investigation: Investigation
         <h2 id="diagnosis-title">Diagnosis</h2>
         <p className={styles.confidence}>
           <span className="numeric">{percent(diagnosis.confidence)}</span> confident
-          <span className={styles.meter} aria-hidden="true">
-            <span style={{ width: `${Math.round(diagnosis.confidence * 100)}%` }} />
-          </span>
         </p>
       </div>
       <p className={styles.cause}>
@@ -118,23 +71,6 @@ export function DiagnosisPanel({ investigation }: { investigation: Investigation
           );
         })}
       </ul>
-
-      {!gated ? (
-        <div className={styles.recommendation}>
-          <h3 className={styles.subhead}>
-            {executable ? "Proposed action" : "Recommended action"}
-          </h3>
-          <p className={styles.action}>
-            {actionLabel(action.type)}: <strong>{action.target_service}</strong>
-          </p>
-          <p className={styles.rationale}>{action.rationale}</p>
-          <p className={styles.note}>
-            {executable
-              ? "The agent can run this only after someone approves it."
-              : "A recommendation for the operator. The agent does not run it."}
-          </p>
-        </div>
-      ) : null}
 
       {investigation.time_to_diagnosis_s !== null ? (
         <p className={`${styles.stats} numeric`}>
