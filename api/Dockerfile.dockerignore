@@ -2,13 +2,14 @@
 # node_modules and local results out of the image.
 *
 !pyproject.toml
-!requirements.lock
+!requirements-runtime.lock
 !README.md
 !LICENSE
 !agent/
 !api/
 !mcp-servers/
 !evals/
+!observability/
 evals/results/
 **/__pycache__/
 **/*.pyc
