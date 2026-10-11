@@ -27,6 +27,10 @@ _PASSTHROUGH_PREFIXES = (
     "OPSPILOT_DOCKER",
     "DOCKER_",
 )
+# The tool server exports its own spans, so it needs to know whether tracing is on and where to
+# send them. Exact names, not an OTEL_ prefix: OTEL_EXPORTER_OTLP_HEADERS can carry a backend
+# credential, which belongs with the agent like a model key does.
+_PASSTHROUGH_NAMES = frozenset({"OPSPILOT_TRACING_ENABLED", "OTEL_EXPORTER_OTLP_ENDPOINT"})
 
 
 def stdio_connection(backend: str = "live", simulation: Path | None = None) -> StdioConnection:
@@ -34,7 +38,13 @@ def stdio_connection(backend: str = "live", simulation: Path | None = None) -> S
     if simulation is not None:
         args += ["--simulation", str(simulation)]
     env = get_default_environment()
-    env.update({k: v for k, v in os.environ.items() if k.startswith(_PASSTHROUGH_PREFIXES)})
+    env.update(
+        {
+            k: v
+            for k, v in os.environ.items()
+            if k.startswith(_PASSTHROUGH_PREFIXES) or k in _PASSTHROUGH_NAMES
+        }
+    )
     # Carries the current span's trace context to the server subprocess, if there is one (empty
     # when tracing is disabled or this is called outside an investigation's span), so its own
     # tool-call spans land in the same trace as the investigation that spawned it.

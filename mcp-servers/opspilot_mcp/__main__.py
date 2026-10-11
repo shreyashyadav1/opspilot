@@ -54,12 +54,17 @@ def main(argv: list[str] | None = None) -> None:
     tracer_provider = configure("opspilot-mcp")
     backend = build_backend(args.backend, args.simulation, tracer_provider)
     server = build_server(backend, tracer_provider=tracer_provider)
-    if args.transport == "streamable-http":
-        server.settings.host = args.host
-        server.settings.port = args.port
-        server.run("streamable-http")
-    else:
-        server.run("stdio")
+    try:
+        if args.transport == "streamable-http":
+            server.settings.host = args.host
+            server.settings.port = args.port
+            server.run("streamable-http")
+        else:
+            server.run("stdio")
+    finally:
+        # A stdio server is stopped by its client closing stdin, and the client only waits a
+        # moment for it to exit: export whatever spans are still buffered before then.
+        tracer_provider.shutdown()
 
 
 if __name__ == "__main__":
