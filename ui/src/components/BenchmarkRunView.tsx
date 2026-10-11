@@ -104,7 +104,17 @@ export function BenchmarkRunView({ runId }: { runId: string }) {
       <div className={styles.page}>
         <BackLink />
         <Notice tone="danger" role="alert">
-          <p>{error.status === 404 ? `There is no benchmark run ${runId}.` : error.message}</p>
+          {error.status === 404 ? (
+            <p>
+              There is no benchmark run {runId}. Runs are read from evals/results; pick one from the
+              list.
+            </p>
+          ) : (
+            <>
+              <p>{error.message}</p>
+              <p>Check that the agent API is running (make api-dev), then reload this page.</p>
+            </>
+          )}
         </Notice>
       </div>
     );
@@ -130,7 +140,9 @@ export function BenchmarkRunView({ runId }: { runId: string }) {
         <dl className={styles.stats}>
           <div>
             <dt>Run</dt>
-            <dd className="numeric">{data.run.run_id}</dd>
+            <dd>
+              <code>{data.run.run_id}</code>
+            </dd>
           </div>
           <div>
             <dt>Started</dt>

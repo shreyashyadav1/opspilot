@@ -1,6 +1,13 @@
 .page {
   display: grid;
   gap: var(--space-5);
+  min-width: 0;
+}
+
+/* Grid items default to their content's min width; a wide table must scroll in its own box,
+   not widen the page. */
+.page > * {
+  min-width: 0;
 }
 
 .back {
@@ -8,8 +15,8 @@
   align-items: center;
   gap: var(--space-1);
   width: fit-content;
+  min-height: 32px;
   font-size: var(--text-sm);
-  font-weight: 600;
   color: var(--ink-2);
   text-decoration: none;
 }
@@ -22,6 +29,10 @@
 .header {
   display: grid;
   gap: var(--space-3);
+}
+
+.header h1 {
+  overflow-wrap: anywhere;
 }
 
 .tags {
@@ -39,37 +50,38 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  background: var(--surface);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-panel);
+  display: grid;
 }
 
 .run {
   position: relative;
   display: grid;
   gap: var(--space-2);
-  padding: var(--space-4) var(--space-5);
-  border-top: 1px solid var(--rule);
+  padding: var(--space-5) var(--space-4);
+  border-bottom: 1px solid var(--rule);
+  transition: background-color var(--dur-state) ease;
 }
 
 .run:first-child {
-  border-top: 0;
+  border-top: 1px solid var(--rule);
 }
 
 .run:hover {
-  background: var(--surface-sunk);
+  background: var(--panel);
 }
 
 .runHead {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-2) var(--space-3);
+}
+
+.runTitle {
+  font-size: var(--text-lg);
 }
 
 .runLink {
-  font-weight: 700;
-  font-size: var(--text-lg);
   text-decoration: none;
 }
 
@@ -88,50 +100,67 @@
 }
 
 .runLink:focus-visible::after {
-  outline: 3px solid var(--focus);
-  outline-offset: -3px;
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
 }
 
 .note {
   font-size: var(--text-sm);
   color: var(--ink-2);
+  max-width: 72ch;
 }
 
 .env {
-  display: inline-block;
-  padding: 1px var(--space-2);
-  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-s);
   font-size: var(--text-xs);
-  font-weight: 600;
+  font-weight: 700;
+  line-height: 1.6;
+  white-space: nowrap;
 }
 
+/* Simulated runs check the harness; their numbers are not results, so they carry a caution. */
 .simulated {
-  color: var(--attention);
-  background: var(--attention-fill);
+  color: var(--degraded);
+  background: var(--degraded-fill);
+  border-color: var(--degraded-line);
 }
 
 .live {
-  color: var(--success);
-  background: var(--success-fill);
+  color: var(--healthy);
+  background: var(--healthy-fill);
+  border-color: var(--healthy-line);
 }
 
 .stats {
-  margin: 0;
+  margin: var(--space-1) 0 0;
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2) var(--space-6);
+  gap: var(--space-3) var(--space-6);
+}
+
+.stats > div {
+  min-width: 0;
 }
 
 .stats dt {
   font-size: var(--text-xs);
   color: var(--ink-3);
-  font-weight: 600;
 }
 
 .stats dd {
   margin: 0;
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.stats code {
+  font-weight: 400;
 }
 
 .sectionTitle {
@@ -140,9 +169,9 @@
 
 .tableWrap {
   overflow-x: auto;
-  background: var(--surface);
+  overscroll-behavior-x: contain;
   border: 1px solid var(--rule);
-  border-radius: var(--radius-panel);
+  border-radius: var(--radius-l);
 }
 
 .table {
@@ -153,7 +182,7 @@
 
 .table th,
 .table td {
-  padding: var(--space-2) var(--space-4);
+  padding: var(--space-3) var(--space-4);
   text-align: left;
   vertical-align: top;
   border-top: 1px solid var(--rule);
@@ -161,15 +190,20 @@
 
 .table thead th {
   border-top: 0;
+  background: var(--sunk);
   font-size: var(--text-xs);
+  font-weight: 400;
   color: var(--ink-3);
-  font-weight: 600;
   white-space: nowrap;
 }
 
 .table tbody th {
-  font-weight: 600;
+  font-weight: 700;
   white-space: nowrap;
+}
+
+.table tbody tr:hover {
+  background: var(--panel);
 }
 
 .definition {
@@ -182,21 +216,21 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .yes {
-  color: var(--success);
+  color: var(--healthy);
 }
 
 .no {
-  color: var(--danger);
+  color: var(--failing);
 }
 
 .loading {
   display: grid;
   gap: var(--space-3);
   padding: var(--space-5);
-  background: var(--surface);
   border: 1px solid var(--rule);
+  border-radius: var(--radius-l);
 }

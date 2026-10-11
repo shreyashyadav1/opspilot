@@ -1,5 +1,6 @@
 "use client";
 
+import { FlaskConical, Server } from "lucide-react";
 import Link from "next/link";
 
 import { dateTime, percent } from "@/lib/format";
@@ -12,8 +13,10 @@ import styles from "./Benchmark.module.css";
 
 export function EnvironmentTag({ run }: { run: BenchmarkRun }) {
   const simulated = run.run.environment === "simulated";
+  const Icon = simulated ? FlaskConical : Server;
   return (
     <span className={`${styles.env} ${simulated ? styles.simulated : styles.live}`}>
+      <Icon size={14} aria-hidden="true" />
       {simulated ? "Simulated telemetry" : "Live demo stack"}
     </span>
   );
@@ -24,9 +27,11 @@ function RunRow({ run }: { run: BenchmarkRun }) {
   return (
     <li className={styles.run}>
       <div className={styles.runHead}>
-        <Link href={`/benchmarks/${encodeURIComponent(run.id)}`} className={styles.runLink}>
-          {run.model.label}
-        </Link>
+        <h2 className={styles.runTitle}>
+          <Link href={`/benchmarks/${encodeURIComponent(run.id)}`} className={styles.runLink}>
+            {run.model.label}
+          </Link>
+        </h2>
         <ModelBadge model={run.model} />
         <EnvironmentTag run={run} />
       </div>
@@ -70,6 +75,7 @@ export function BenchmarkRuns() {
     return (
       <Notice tone="danger" role="alert">
         <p>Could not load benchmark runs: {error.message}</p>
+        <p>Check that the agent API is running (make api-dev), then reload this page.</p>
       </Notice>
     );
   }
