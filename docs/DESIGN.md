@@ -136,9 +136,10 @@ Telemetry, kept consistent across both languages:
   outbound calls. Orders additionally exposes HikariCP pool metrics. Identical metric names
   mean one PromQL catalog covers all services.
 - **Traces**: W3C trace context propagates storefront -> orders -> payments, and from the MCP
-  server into the control plane (deploys, rollbacks) and whichever service it reaches
-  (OpenTelemetry in Python, Micrometer Tracing in Spring). Spans are always created; export to
-  the trace backend is opt in (`OPSPILOT_TRACING_ENABLED`, see 3.6).
+  server into the control plane (deploy history, rollbacks) (OpenTelemetry in Python,
+  Micrometer Tracing in Spring). Health, metrics, admin and chaos requests are not traced.
+  Spans are always created; export to the trace backend is opt in
+  (`OPSPILOT_TRACING_ENABLED`, see 3.6).
 - **Health**: `/health` (Python) and `/actuator/health` (Spring, includes the database check).
 - **Deploys**: the control plane records every deploy and rollback with version, author,
   change summary and config diff. It seeds a realistic history on startup.
@@ -354,14 +355,14 @@ server and (where the services' own instrumentation allows it) the demo system:
 
 **Propagation into the demo system.** The agent passes its current span's W3C `traceparent` to
 the MCP server subprocess once, as an environment variable (stdio has no headers to carry it
-otherwise); every tool call the server then handles is a child of that investigation's trace.
-The server's own HTTP client to the control plane is instrumented, so a `rollback_deploy` or a
-deploy-history read continues into the control plane and, from there, into whichever service
-receives the resulting config push - the same propagation the demo services already use among
-themselves (storefront -> orders -> payments). Health checks stay out of the trace: the
-services exclude `/health` from their own instrumentation, the same way it is already excluded
-from their logs and metrics, and fault injection (`/chaos/*`) is excluded for the same reason
-deploys and rollbacks are not.
+otherwise), together with the tracing switch and endpoint; every tool call the server handles is
+a child of that investigation's trace. The server's HTTP client is instrumented, so each call it
+makes carries the trace on: a deploy-history read or a `rollback_deploy` continues into the
+control plane, and the control plane's own call to a service's admin API shows up as a client
+span under the rollback. Where tracing stops is deliberate and the same in every service:
+health checks, metrics scrapes, admin endpoints (config pushes) and the chaos API are kept out of
+traces just as they are kept out of logs and metrics. A health check made by the MCP server
+therefore appears only as the server's own client span, and fault injection leaves no trace.
 
 **Export and the trace backend.** Every process (the CLI, the agent API, the MCP server
 subprocess, each demo service) always creates spans so trace ids exist for correlation, but
