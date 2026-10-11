@@ -23,9 +23,10 @@ export const STATUS: Record<Status, { label: string; tone: Tone; hint: string }>
     hint: "The approved action was attempted and failed.",
   },
   rejected: { label: "Rejected", tone: "neutral", hint: "The proposed action was not executed." },
+  // A recommendation still needs a person to act on it, so it is not "settled".
   advisory: {
     label: "Diagnosed",
-    tone: "neutral",
+    tone: "degraded",
     hint: "Diagnosis with a recommendation for the operator.",
   },
   no_diagnosis: {
