@@ -50,8 +50,8 @@ def configure(service_name: str, service_version: str = "0.1.0") -> TracerProvid
 
     Safe to call more than once per process (later calls build and return a provider but do not
     replace the global one): call it once at the top of every entry point (the CLI, the agent
-    API, the benchmark CLI, the MCP server). Tests do not call this at all; they build their own
-    provider with an in-memory exporter and pass it directly to the code under test.
+    API, the benchmark CLI, the MCP server). Tests that assert on spans do not depend on it:
+    they build their own provider with an in-memory exporter and pass it to the code under test.
     """
     global _configured
     resource = Resource.create({"service.name": service_name, "service.version": service_version})
