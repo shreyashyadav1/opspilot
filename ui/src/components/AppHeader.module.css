@@ -27,6 +27,7 @@
 
 .mark {
   color: var(--ink);
+  --gate-bar: var(--ink-3);
 }
 
 .nav ul {

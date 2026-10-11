@@ -214,8 +214,9 @@
   white-space: nowrap;
 }
 
+/* Normal is quiet: a call that worked is plain ink; only a failure takes a state color. */
 .ok {
-  color: var(--healthy);
+  color: var(--ink-3);
 }
 
 .failed {
@@ -318,7 +319,7 @@
   padding: var(--space-4) 0;
   background: var(--panel);
   border: 1px solid var(--rule);
-  border-radius: var(--radius-l);
+  border-radius: var(--radius-m);
 }
 
 .gate_pending .gateBand {

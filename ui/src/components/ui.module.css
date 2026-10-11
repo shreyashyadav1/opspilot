@@ -220,8 +220,8 @@ textarea.input {
   gap: var(--space-2);
   justify-items: start;
   padding: var(--space-6) var(--space-5);
-  border: 1px dashed var(--rule-strong);
-  border-radius: var(--radius-l);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-m);
 }
 
 .emptyTitle {

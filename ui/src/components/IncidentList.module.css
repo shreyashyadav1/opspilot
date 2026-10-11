@@ -59,7 +59,7 @@
 .pending {
   background: var(--intent-fill);
   border: 1px solid var(--intent);
-  border-radius: var(--radius-l);
+  border-radius: var(--radius-m);
 }
 
 .pending + .pending {

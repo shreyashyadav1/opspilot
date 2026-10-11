@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   // The page background (--night): the dashboard is dark only.
-  themeColor: "#1a1618",
+  themeColor: "#242023",
   colorScheme: "dark",
 };
 

@@ -170,7 +170,7 @@
   overflow-x: auto;
   overscroll-behavior-x: contain;
   border: 1px solid var(--rule);
-  border-radius: var(--radius-l);
+  border-radius: var(--radius-m);
 }
 
 .table {
@@ -225,7 +225,7 @@
 }
 
 .yes {
-  color: var(--healthy);
+  color: var(--ink-2);
 }
 
 .no {
