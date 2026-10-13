@@ -62,6 +62,16 @@ export type TimelineItem =
  * Group the flat trace into what a reader follows: each model turn with the tool calls it
  * requested, and the approval gate with the decision taken on it.
  */
+/** The tool calls the diagnosis cites as evidence, by trace seq. */
+export function citedCalls(investigation: InvestigationDetail): Set<number> {
+  const cited = new Set<number>();
+  for (const item of investigation.diagnosis?.evidence ?? []) {
+    const call = evidenceCall(investigation.trace, item);
+    if (call) cited.add(call.seq);
+  }
+  return cited;
+}
+
 export function buildTimeline(trace: TraceEvent[]): TimelineItem[] {
   const items: TimelineItem[] = [];
   const turns = new Map<number, Extract<TimelineItem, { type: "turn" }>>();

@@ -27,7 +27,10 @@ describe("Timeline", () => {
     expect(calls.map((call) => call.id)).toEqual(["call-3", "call-4"]);
     expect(calls[0]).toHaveTextContent("Call 1");
     expect(calls[1]).toHaveTextContent("Call 2");
-    expect(screen.getByText("2 tool calls in 1.1 s")).toBeInTheDocument();
+    expect(screen.getByText("2 tool calls in 1.1 s, 1 cited as evidence")).toBeInTheDocument();
+    // The deploy history is the call the diagnosis cites.
+    expect(calls[1]).toHaveTextContent("Call 2, cited as evidence");
+    expect(calls[0]).not.toHaveTextContent("cited as evidence");
   });
 
   it("draws the approval gate with the action waiting behind it", () => {

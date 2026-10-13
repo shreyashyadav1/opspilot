@@ -184,6 +184,19 @@
   color: var(--failing);
 }
 
+/* Cited by the diagnosis: a solid number and full-strength summary; the rest of the trail
+   recedes a step. */
+.cited .callNo {
+  background: var(--ink-2);
+  border-color: var(--ink-2);
+  color: var(--sunk);
+  font-weight: 700;
+}
+
+.cited .summary {
+  color: var(--ink);
+}
+
 .callMain {
   min-width: 0;
 }

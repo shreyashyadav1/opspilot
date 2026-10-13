@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { executed, investigation, rejected, withDeployHistory } from "@/test/fixtures";
 
-import { buildTimeline, callNumbers, evidenceCall, gateState } from "./timeline";
+import { buildTimeline, callNumbers, citedCalls, evidenceCall, gateState } from "./timeline";
 
 describe("buildTimeline", () => {
   it("nests tool calls under the model turn that requested them", () => {
@@ -50,6 +50,11 @@ describe("evidenceCall", () => {
     const logs = { source: "logs" as const, service: "orders", detail: "40x ERROR" };
     expect(evidenceCall(trace, deploys)).toBeNull();
     expect(evidenceCall(trace, logs)).toBeNull();
+  });
+
+  it("collects the calls the diagnosis cites", () => {
+    expect([...citedCalls(withDeployHistory())]).toEqual([4]);
+    expect(citedCalls(investigation({ diagnosis: null })).size).toBe(0);
   });
 
   it("prefers the metric the evidence names", () => {

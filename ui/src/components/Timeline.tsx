@@ -8,6 +8,7 @@ import {
   buildTimeline,
   callAnchor,
   callNumbers,
+  citedCalls,
   gateState,
   type GateState,
   type TimelineItem,
@@ -36,10 +37,13 @@ function ToolCall({
   call,
   number,
   fresh,
+  cited,
 }: {
   call: Of<"tool_call">;
   number: number | undefined;
   fresh: boolean;
+  /** The diagnosis cites this call as evidence. */
+  cited: boolean;
 }) {
   const { tool, args, ok, latency_ms: latency, summary, output } = call.data;
   const violation = call.data.policy_violation;
@@ -47,12 +51,16 @@ function ToolCall({
   return (
     <li
       id={callAnchor(call.seq)}
-      className={`${styles.call} ${ok ? "" : styles.callFailed}`}
+      className={`${styles.call} ${ok ? "" : styles.callFailed} ${cited ? styles.cited : ""}`}
       data-fresh={fresh || undefined}
     >
-      <span className={`${styles.callNo} numeric`}>
+      <span
+        className={`${styles.callNo} numeric`}
+        title={cited ? "Cited as evidence in the diagnosis" : undefined}
+      >
         <span className="visually-hidden">Call </span>
         {number}
+        {cited ? <span className="visually-hidden">, cited as evidence</span> : null}
       </span>
       <div className={styles.callMain}>
         <div className={styles.callHead}>
@@ -81,11 +89,13 @@ function Turn({
   item,
   start,
   numbers,
+  cited,
   isFresh,
 }: {
   item: Extract<TimelineItem, { type: "turn" }>;
   start: string;
   numbers: Map<number, number>;
+  cited: Set<number>;
   isFresh: (key: string) => boolean;
 }) {
   const { turn, calls } = item;
@@ -120,6 +130,7 @@ function Turn({
                 call={call}
                 number={numbers.get(call.seq)}
                 fresh={isFresh(callAnchor(call.seq))}
+                cited={cited.has(call.seq)}
               />
             ))}
           </ol>
@@ -305,6 +316,7 @@ function keysOf(items: TimelineItem[]): Set<string> {
 export function Timeline({ investigation }: { investigation: InvestigationDetail }) {
   const items = buildTimeline(investigation.trace);
   const numbers = callNumbers(investigation.trace);
+  const cited = citedCalls(investigation);
   const start = investigation.trace[0]?.at ?? investigation.created_at;
   const state = gateState(investigation);
   const running = investigation.status === "running" || investigation.status === "queued";
@@ -322,6 +334,7 @@ export function Timeline({ investigation }: { investigation: InvestigationDetail
           <p className={`${styles.count} numeric`}>
             {numbers.size} tool {numbers.size === 1 ? "call" : "calls"} in{" "}
             {offset(start, last).replace("+", "")}
+            {cited.size > 0 ? `, ${cited.size} cited as evidence` : ""}
           </p>
         ) : null}
       </div>
@@ -329,7 +342,14 @@ export function Timeline({ investigation }: { investigation: InvestigationDetail
         {items.map((item) => {
           if (item.type === "turn")
             return (
-              <Turn key={item.key} item={item} start={start} numbers={numbers} isFresh={isFresh} />
+              <Turn
+                key={item.key}
+                item={item}
+                start={start}
+                numbers={numbers}
+                cited={cited}
+                isFresh={isFresh}
+              />
             );
           if (item.type === "gate")
             return (
