@@ -106,7 +106,7 @@ export function InvestigationView({ investigationId }: { investigationId: string
                 title={dateTime(data.created_at)}
                 className="numeric"
               >
-                {clockTime(data.created_at)}
+                {clockTime(data.created_at, true)}
               </time>
             </dd>
           </div>

@@ -109,12 +109,14 @@ export function money(value: number | null | undefined): string {
   return `$${value.toFixed(value > 0 && value < 0.01 ? 4 : 2)}`;
 }
 
-export function clockTime(iso: string): string {
+/** A wall-clock time, "15:56:52"; with the zone ("15:56:52 EDT") where a page states it once. */
+export function clockTime(iso: string, withZone = false): string {
   return new Date(iso).toLocaleTimeString(undefined, {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
     hour12: false,
+    ...(withZone ? { timeZoneName: "short" } : {}),
   });
 }
 
