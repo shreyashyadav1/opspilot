@@ -25,7 +25,7 @@ const RESOLVED_BY: Record<string, string> = {
 };
 
 const INTRO =
-  "Stages an incident through the control plane's chaos API. The agent never sees this API " +
+  "Stages an incident through the control plane’s chaos API. The agent never sees this API " +
   "or the injected fault; it only sees the symptoms.";
 
 export function DemoFaultPanel() {
