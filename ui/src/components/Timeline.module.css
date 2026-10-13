@@ -1,12 +1,23 @@
 .section {
-  --when: 78px;
-  --marker: 22px;
+  --when: 76px;
+  --marker: 18px;
   --col-gap: var(--space-3);
   --rail-x: calc(var(--when) + var(--col-gap) + var(--marker) / 2 - 1px);
+  min-width: 0;
 }
 
-.heading {
+.headingRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-4);
   margin-bottom: var(--space-4);
+}
+
+.count {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
 }
 
 .timeline {
@@ -27,7 +38,7 @@
 .entry {
   position: relative;
   padding-bottom: var(--space-5);
-  animation: arrive 180ms ease-out;
+  border-radius: var(--radius-m);
 }
 
 /* The rail: one continuous line through every step. */
@@ -38,18 +49,11 @@
   top: 20px;
   bottom: 0;
   width: 2px;
-  background: var(--rule-strong);
+  background: var(--rule);
 }
 
 .entry:last-child::before {
   display: none;
-}
-
-@keyframes arrive {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
 }
 
 .when {
@@ -68,15 +72,38 @@
 .dot {
   justify-self: center;
   margin-top: 5px;
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  background: var(--surface);
-  border: 2px solid var(--ink-2);
+  background: var(--night);
+  border: 2px solid var(--ink-3);
   display: grid;
   place-items: center;
   position: relative;
   z-index: 1;
+}
+
+.origin .dot {
+  border-color: var(--ink);
+}
+
+.verdict .dot {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.good .dot {
+  border-color: var(--healthy);
+  background: var(--healthy);
+}
+
+.bad .dot {
+  border-color: var(--failing);
+  color: var(--failing);
+}
+
+.warn .dot {
+  border-color: var(--degraded);
 }
 
 .body {
@@ -85,7 +112,7 @@
 
 .title {
   font-size: var(--text-sm);
-  font-weight: 650;
+  font-weight: 700;
   overflow-wrap: anywhere;
 }
 
@@ -97,47 +124,97 @@
   margin-top: 2px;
   font-size: var(--text-sm);
   color: var(--ink-2);
+  max-width: var(--measure);
   overflow-wrap: anywhere;
 }
 
+/* The model's own words, set apart on a raised ground rather than with a stripe. */
 .reasoning {
   margin-top: var(--space-2);
-  padding-left: var(--space-3);
-  border-left: 2px solid var(--rule-strong);
+  padding: var(--space-2) var(--space-3);
+  background: var(--panel);
+  border-radius: var(--radius-m);
   font-size: var(--text-sm);
-  max-width: 72ch;
+  max-width: var(--measure);
 }
 
+/* Tool calls: numbered rows on a sunk ground, the evidence trail the diagnosis cites. */
 .calls {
   margin: var(--space-3) 0 0;
   padding: 0;
   list-style: none;
-  display: grid;
-  gap: var(--space-2);
+  background: var(--sunk);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-m);
+  overflow: hidden;
 }
 
 .call {
+  position: relative;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: var(--space-3);
   padding: var(--space-3);
-  background: var(--surface);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-panel);
+  border-top: 1px solid var(--rule);
+  scroll-margin-top: var(--space-5);
 }
 
-.callFailed {
-  border-color: color-mix(in srgb, var(--danger) 45%, var(--rule));
+.call:first-child {
+  border-top: 0;
+}
+
+/* Arrived here from a citation in the diagnosis. */
+.call:target {
+  background: var(--panel-2);
+  box-shadow: inset 0 0 0 1px var(--ink-3);
+}
+
+.callNo {
+  display: grid;
+  place-items: center;
+  height: 22px;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-s);
+  font-size: var(--text-xs);
+  color: var(--ink-2);
+}
+
+.callFailed .callNo {
+  border-color: var(--failing-line);
+  color: var(--failing);
+}
+
+/* Cited by the diagnosis: a solid number and full-strength summary; the rest of the trail
+   recedes a step. */
+.cited .callNo {
+  background: var(--ink-2);
+  border-color: var(--ink-2);
+  color: var(--sunk);
+  font-weight: 700;
+}
+
+.cited .summary {
+  color: var(--ink);
+}
+
+.callMain {
+  min-width: 0;
 }
 
 .callHead {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: var(--space-1) var(--space-3);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px var(--space-3);
 }
 
 .signature {
-  font-size: var(--text-xs);
-  font-weight: 600;
+  font-size: var(--text-sm);
   overflow-wrap: anywhere;
+}
+
+.signature code {
+  font-size: 1em;
 }
 
 .ok,
@@ -146,140 +223,191 @@
   align-items: center;
   gap: var(--space-1);
   font-size: var(--text-xs);
-  font-weight: 600;
+  font-weight: 700;
   white-space: nowrap;
 }
 
+/* Normal is quiet: a call that worked is plain ink; only a failure takes a state color. */
 .ok {
-  color: var(--success);
+  color: var(--ink-3);
 }
 
 .failed {
-  color: var(--danger);
+  color: var(--failing);
 }
 
-.ok span,
-.failed span {
+.latency {
   color: var(--ink-3);
   font-weight: 400;
   margin-left: var(--space-1);
 }
 
 .summary {
-  margin-top: var(--space-1);
+  margin-top: 2px;
   font-size: var(--text-sm);
+  color: var(--ink-2);
+  max-width: var(--measure);
   overflow-wrap: anywhere;
 }
 
 .details {
-  margin-top: var(--space-2);
+  margin-top: var(--space-1);
   font-size: var(--text-xs);
 }
 
 .details summary {
   cursor: pointer;
   color: var(--ink-2);
-  font-weight: 600;
+  font-weight: 700;
   width: fit-content;
+  padding: var(--space-1) 0;
 }
 
 .details summary:hover {
   color: var(--ink);
 }
 
-.good .dot {
-  border-color: var(--success);
-  background: var(--success);
-}
-
-.bad .dot {
-  border-color: var(--danger);
-  color: var(--danger);
-}
-
-.warn .dot {
-  border-color: var(--gate-bar);
-}
-
 .progress .meta {
-  font-style: italic;
+  color: var(--ink-3);
 }
 
+/* Still working: a ring that widens and fades around the newest step. */
 .pulse {
-  border-color: var(--active);
-  animation: pulse 1.6s ease-in-out infinite;
+  border-color: var(--ink-2);
 }
 
-@keyframes pulse {
-  50% {
-    box-shadow: 0 0 0 5px color-mix(in srgb, var(--active) 20%, transparent);
+.pulse::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 1px solid var(--ink-3);
+  opacity: 0;
+  animation: ring 1.8s var(--ease-out) infinite;
+}
+
+@keyframes ring {
+  from {
+    opacity: 1;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.3);
   }
 }
 
-/* The approval gate: a barrier across the rail. */
+/* A step that arrived while the page was open: a brief raised ground behind it, then gone. */
+.entry,
+.call {
+  isolation: isolate;
+}
+
+.entry[data-fresh]::after,
+.call[data-fresh]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: var(--radius-m);
+  background: var(--panel-2);
+  opacity: 0;
+  pointer-events: none;
+  animation: arrived 1.2s var(--ease-out);
+}
+
+@keyframes arrived {
+  from {
+    opacity: 1;
+  }
+}
+
+/* The approval gate: the proposal held across the trail. */
 .gate {
   position: relative;
   margin: var(--space-1) 0 var(--space-5);
-  animation: arrive 180ms ease-out;
 }
 
 .gateBand {
   padding: var(--space-4) 0;
-  border-radius: 2px;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-m);
 }
 
 .gate_pending .gateBand {
-  background-image: var(--hazard), var(--hazard);
-  background-size: 100% 6px;
-  background-position:
-    left top,
-    left bottom;
-  background-repeat: no-repeat;
-  background-color: var(--gate-fill);
+  background: var(--intent-fill);
+  border-color: var(--intent);
 }
 
 .gate_executing .gateBand,
 .gate_executed .gateBand {
-  background: var(--success-fill);
-  border-top: 3px solid var(--success);
-  border-bottom: 3px solid var(--success);
+  background: var(--healthy-fill);
+  border-color: var(--healthy-line);
 }
 
 .gate_rejected .gateBand {
-  background: var(--neutral-fill);
-  border-top: 3px solid var(--neutral);
-  border-bottom: 3px solid var(--neutral);
+  border-color: var(--rule-strong);
 }
 
 .gate_failed .gateBand {
-  background: var(--danger-fill);
-  border-top: 3px solid var(--danger);
-  border-bottom: 3px solid var(--danger);
+  background: var(--failing-fill);
+  border-color: var(--failing-line);
 }
 
 .gateMark {
   justify-self: center;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   color: var(--ink);
+}
+
+.gateMark [data-part="bar"] {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.gate_executing .gateMark,
+.gate_executed .gateMark {
+  --gate-bar: var(--healthy);
+}
+
+.gate_executing .gateMark [data-part="bar"],
+.gate_executed .gateMark [data-part="bar"] {
+  transform: translateY(-6px);
+}
+
+.gate_rejected .gateMark {
+  --gate-bar: var(--ink-3);
+}
+
+.gate_failed .gateMark {
+  --gate-bar: var(--failing);
 }
 
 .gateText {
   margin-top: 2px;
-  font-weight: 600;
+  font-weight: 700;
   font-size: var(--text-sm);
 }
 
 .gate_pending .gateText {
-  color: var(--gate-ink);
+  color: var(--intent);
 }
 
 .gate .meta a {
-  font-weight: 600;
+  position: relative;
+  font-weight: 700;
   color: var(--ink);
 }
 
-/* What waits behind the gate: drawn but not yet (or never) taken. */
+.gate .meta a::after {
+  content: "";
+  position: absolute;
+  inset: -6px -4px;
+}
+
+/* What waits behind the gate: drawn, but not yet (or never) taken. */
 .ghost {
   position: relative;
   padding: var(--space-4) 0 0;
@@ -298,16 +426,25 @@
 
 .ghost > p {
   grid-column: 3;
+  overflow-wrap: anywhere;
 }
 
 .ghostDot {
   grid-column: 2;
   justify-self: center;
   margin-top: 4px;
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   border: 2px dashed var(--rule-strong);
+}
+
+.gate_pending .ghost > p {
+  color: var(--ink-2);
+}
+
+.gate_pending .ghostDot {
+  border-color: var(--intent);
 }
 
 .gate_rejected .ghost p {
@@ -315,14 +452,66 @@
   text-decoration-thickness: 1px;
 }
 
+/* Narrow screens: the time moves above each step, so the steps keep the width. */
 @media (max-width: 520px) {
   .section {
-    --when: 58px;
-    --marker: 18px;
+    --marker: 16px;
     --col-gap: var(--space-2);
+    --rail-x: calc(var(--marker) / 2 - 1px);
   }
 
-  .offset {
-    display: none;
+  .entry,
+  .gateBand,
+  .ghost {
+    grid-template-columns: var(--marker) minmax(0, 1fr);
+  }
+
+  .when {
+    grid-column: 2;
+    grid-row: 1;
+    display: flex;
+    gap: var(--space-2);
+    justify-items: start;
+    padding-top: 0;
+  }
+
+  .dot,
+  .gateMark {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    align-self: start;
+  }
+
+  .entry > .body,
+  .gateBand > .body {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .gateBand {
+    padding-left: var(--space-2);
+    padding-right: var(--space-3);
+  }
+
+  .ghostDot {
+    grid-column: 1;
+  }
+
+  .ghost > p {
+    grid-column: 2;
+  }
+
+  .callHead {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .call {
+    grid-template-columns: 22px minmax(0, 1fr);
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-2);
+  }
+
+  .details summary {
+    padding: var(--space-2) 0;
   }
 }

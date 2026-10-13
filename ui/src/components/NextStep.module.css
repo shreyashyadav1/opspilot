@@ -1,0 +1,47 @@
+.panel {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-l);
+}
+
+.working {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xl);
+}
+
+.progress {
+  font-size: var(--text-base);
+}
+
+.action {
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.rationale {
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+  max-width: var(--measure);
+}
+
+.note {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  max-width: var(--measure);
+}
+
+.spin {
+  flex: none;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

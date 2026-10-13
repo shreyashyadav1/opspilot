@@ -3,7 +3,7 @@
 import { Check, ChevronLeft, X } from "lucide-react";
 import Link from "next/link";
 
-import { dateTime, number, percent } from "@/lib/format";
+import { dateTime, money, number, percent } from "@/lib/format";
 import { useBenchmark } from "@/lib/hooks";
 import type { BenchmarkResult, BenchmarkSummary } from "@/lib/types";
 
@@ -15,10 +15,8 @@ import styles from "./Benchmark.module.css";
 type MetricRow = { label: string; value: string; definition: string };
 
 function metrics(s: BenchmarkSummary): MetricRow[] {
-  const cost =
-    s.mean_cost_usd === null || s.mean_cost_usd === undefined
-      ? "n/a"
-      : `$${s.mean_cost_usd.toFixed(4)}`;
+  // Same money format as the investigation page: $0.00, or four places for sub-cent costs.
+  const cost = money(s.mean_cost_usd);
   return [
     {
       label: "Root-cause accuracy",
@@ -33,7 +31,7 @@ function metrics(s: BenchmarkSummary): MetricRow[] {
     {
       label: "Action accuracy",
       value: percent(s.action_accuracy),
-      definition: "The proposed action type and target match the scenario's expected action.",
+      definition: "The proposed action type and target match the scenario’s expected action.",
     },
     {
       label: "Tool-call precision",
@@ -44,7 +42,7 @@ function metrics(s: BenchmarkSummary): MetricRow[] {
     {
       label: "Evidence recall",
       value: percent(s.evidence_recall),
-      definition: "Share of the scenario's required observations the agent collected.",
+      definition: "Share of the scenario’s required observations the agent collected.",
     },
     {
       label: "Steps and tool calls",
@@ -104,7 +102,17 @@ export function BenchmarkRunView({ runId }: { runId: string }) {
       <div className={styles.page}>
         <BackLink />
         <Notice tone="danger" role="alert">
-          <p>{error.status === 404 ? `There is no benchmark run ${runId}.` : error.message}</p>
+          {error.status === 404 ? (
+            <p>
+              There is no benchmark run {runId}. Runs are read from evals/results; pick one from the
+              list.
+            </p>
+          ) : (
+            <>
+              <p>{error.message}</p>
+              <p>Check that the agent API is running (make api-dev), then reload this page.</p>
+            </>
+          )}
         </Notice>
       </div>
     );
@@ -130,7 +138,9 @@ export function BenchmarkRunView({ runId }: { runId: string }) {
         <dl className={styles.stats}>
           <div>
             <dt>Run</dt>
-            <dd className="numeric">{data.run.run_id}</dd>
+            <dd>
+              <code>{data.run.run_id}</code>
+            </dd>
           </div>
           <div>
             <dt>Started</dt>
@@ -182,7 +192,9 @@ export function BenchmarkRunView({ runId }: { runId: string }) {
                 <tr key={row.label}>
                   <th scope="row">{row.label}</th>
                   <td className="numeric">{row.value}</td>
-                  <td className={styles.definition}>{row.definition}</td>
+                  <td className={styles.definition}>
+                    <span>{row.definition}</span>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -199,10 +211,10 @@ export function BenchmarkRunView({ runId }: { runId: string }) {
             <thead>
               <tr>
                 <th scope="col">Scenario</th>
-                <th scope="col">Expected</th>
-                <th scope="col">Diagnosed</th>
                 <th scope="col">Root cause</th>
                 <th scope="col">Action</th>
+                <th scope="col">Expected</th>
+                <th scope="col">Diagnosed</th>
                 <th scope="col">Tool precision</th>
                 <th scope="col">Steps</th>
                 <th scope="col">Time (s)</th>
@@ -214,14 +226,14 @@ export function BenchmarkRunView({ runId }: { runId: string }) {
                   <th scope="row">
                     <code>{result.scenario}</code>
                   </th>
-                  <td>{result.expected}</td>
-                  <td>{diagnosed(result)}</td>
                   <td>
                     <Mark ok={result.score.root_cause_correct} />
                   </td>
                   <td>
                     <Mark ok={result.score.action_correct} />
                   </td>
+                  <td>{result.expected}</td>
+                  <td>{diagnosed(result)}</td>
                   <td className="numeric">{percent(result.score.tool_call_precision)}</td>
                   <td className="numeric">{result.score.steps ?? "n/a"}</td>
                   <td className="numeric">{number(result.score.time_to_diagnosis_s ?? null, 2)}</td>

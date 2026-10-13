@@ -17,14 +17,21 @@
   margin-top: var(--space-1);
 }
 
+/* Common alerts, one tap away. */
 .preset {
-  padding: 2px var(--space-2);
+  min-height: 32px;
+  padding: var(--space-1) var(--space-3);
   border: 1px solid var(--rule-strong);
-  border-radius: var(--radius-control);
-  background: var(--surface);
+  border-radius: var(--radius-s);
+  background: transparent;
   font-size: var(--text-xs);
   color: var(--ink-2);
   cursor: pointer;
+  text-align: left;
+  transition:
+    color var(--dur-hover) ease,
+    border-color var(--dur-hover) ease,
+    background-color var(--dur-hover) ease;
 }
 
 .preset:hover {
@@ -33,9 +40,9 @@
 }
 
 .preset[aria-pressed="true"] {
-  border-color: var(--ink);
+  border-color: var(--ink-2);
   color: var(--ink);
-  background: var(--surface-sunk);
+  background: var(--panel-2);
 }
 
 .optional {

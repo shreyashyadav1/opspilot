@@ -42,14 +42,19 @@ export function StartInvestigationForm() {
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    // Invalid input: say what to fix and put the cursor in the field that needs it.
+    const field = (name: string) =>
+      (event.currentTarget.elements.namedItem(name) as HTMLElement | null)?.focus();
     const title = alert.trim();
     if (title.length < 3) {
       setError("Describe the alert in at least 3 characters.");
+      field("alert");
       return;
     }
     const minutes = firing.trim() ? Number(firing) : null;
     if (minutes !== null && (!Number.isInteger(minutes) || minutes < 1 || minutes > 240)) {
       setError("Firing time must be a whole number of minutes between 1 and 240.");
+      field("firing_minutes");
       return;
     }
     setSubmitting(true);
@@ -65,7 +70,11 @@ export function StartInvestigationForm() {
       await mutate("investigations");
       router.push(`/investigations/${created.id}`);
     } catch (exc) {
-      setError(exc instanceof ApiError ? exc.message : "The investigation could not be started.");
+      setError(
+        exc instanceof ApiError
+          ? exc.message
+          : "The investigation could not be started. Check that the agent API is running, then try again.",
+      );
       setSubmitting(false);
     }
   }
@@ -87,11 +96,13 @@ export function StartInvestigationForm() {
           </label>
           <input
             id={`${ids}-alert`}
+            name="alert"
             className={uiStyles.input}
             value={alert}
             onChange={(event) => setAlert(event.target.value)}
             maxLength={200}
             required
+            autoComplete="off"
             aria-invalid={error?.startsWith("Describe") ? true : undefined}
           />
           <div className={styles.presets} role="group" aria-label="Common alerts">
@@ -119,6 +130,7 @@ export function StartInvestigationForm() {
             </label>
             <select
               id={`${ids}-service`}
+              name="service"
               className={uiStyles.input}
               value={service}
               onChange={(event) => setService(event.target.value)}
@@ -137,12 +149,15 @@ export function StartInvestigationForm() {
             </label>
             <input
               id={`${ids}-firing`}
+              name="firing_minutes"
               className={uiStyles.input}
               inputMode="numeric"
-              placeholder="Optional"
+              placeholder="e.g. 15"
+              autoComplete="off"
               value={firing}
               onChange={(event) => setFiring(event.target.value)}
               aria-describedby={`${ids}-firing-hint`}
+              aria-invalid={error?.startsWith("Firing") ? true : undefined}
             />
             <span id={`${ids}-firing-hint`} className={uiStyles.hint}>
               Narrows the log search window.
@@ -156,6 +171,8 @@ export function StartInvestigationForm() {
           </label>
           <textarea
             id={`${ids}-details`}
+            name="details"
+            autoComplete="off"
             className={uiStyles.input}
             value={details}
             onChange={(event) => setDetails(event.target.value)}
@@ -171,6 +188,7 @@ export function StartInvestigationForm() {
             </label>
             <select
               id={`${ids}-model`}
+              name="model"
               className={uiStyles.input}
               value={chosen}
               onChange={(event) => setModel(event.target.value)}
@@ -199,8 +217,8 @@ export function StartInvestigationForm() {
           </div>
         ) : null}
 
-        <Button type="submit" variant="primary" size="large" disabled={submitting || blocked}>
-          {submitting ? "Starting..." : "Start investigation"}
+        <Button type="submit" variant="secondary" size="large" disabled={submitting || blocked}>
+          {submitting ? "Starting…" : "Start investigation"}
         </Button>
       </form>
     </Panel>

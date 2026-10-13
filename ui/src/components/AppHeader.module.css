@@ -1,5 +1,5 @@
 .header {
-  background: var(--surface);
+  background: var(--sunk);
   border-bottom: 1px solid var(--rule);
 }
 
@@ -7,7 +7,7 @@
   max-width: var(--page-width);
   margin: 0 auto;
   padding: 0 var(--gutter);
-  min-height: 60px;
+  min-height: 56px;
   display: flex;
   align-items: center;
   gap: var(--space-6);
@@ -18,14 +18,16 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  font-weight: 750;
+  font-weight: 700;
   font-size: var(--text-lg);
-  letter-spacing: -0.01em;
   text-decoration: none;
+  /* The 44px hit area of a tap target, without a taller bar. */
+  min-height: 44px;
 }
 
 .mark {
   color: var(--ink);
+  --gate-bar: var(--ink-3);
 }
 
 .nav ul {
@@ -37,21 +39,30 @@
 }
 
 .nav a {
-  display: inline-block;
-  padding: var(--space-2) var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-3);
   color: var(--ink-2);
-  font-weight: 600;
   font-size: var(--text-sm);
   text-decoration: none;
   border-bottom: 2px solid transparent;
+  transition:
+    color var(--dur-hover) ease,
+    border-color var(--dur-hover) ease;
 }
 
 .nav a:hover {
   color: var(--ink);
+  border-bottom-color: var(--rule-strong);
 }
 
 .nav .current {
   color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+
+.nav .current:hover {
   border-bottom-color: var(--ink);
 }
 
@@ -62,6 +73,7 @@
   gap: var(--space-2);
   font-size: var(--text-sm);
   min-height: 24px;
+  min-width: 0;
 }
 
 .modelLabel {
@@ -69,17 +81,19 @@
 }
 
 .modelName {
-  font-weight: 600;
+  font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .warn {
-  color: var(--danger);
+  flex: none;
+  color: var(--failing);
 }
 
 @media (max-width: 720px) {
   .inner {
-    gap: var(--space-3);
-    padding-top: var(--space-2);
+    gap: var(--space-1) var(--space-4);
+    padding-top: var(--space-1);
     padding-bottom: var(--space-2);
   }
 
@@ -87,5 +101,6 @@
     margin-left: 0;
     width: 100%;
     flex-wrap: wrap;
+    row-gap: var(--space-1);
   }
 }

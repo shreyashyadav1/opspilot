@@ -1,3 +1,4 @@
+/* Buttons: one solid pale fill for the action that matters, outlines for the rest. */
 .button {
   display: inline-flex;
   align-items: center;
@@ -6,20 +7,35 @@
   min-height: 40px;
   padding: 0 var(--space-4);
   border: 1px solid transparent;
-  border-radius: var(--radius-control);
-  font-weight: 600;
+  border-radius: var(--radius-m);
+  font-weight: 700;
   font-size: var(--text-sm);
   line-height: 1.2;
   text-decoration: none;
   cursor: pointer;
   transition:
-    background-color 120ms ease,
-    border-color 120ms ease;
+    background-color var(--dur-hover) ease,
+    border-color var(--dur-hover) ease,
+    color var(--dur-hover) ease;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .button {
+    transition:
+      background-color var(--dur-hover) ease,
+      border-color var(--dur-hover) ease,
+      color var(--dur-hover) ease,
+      transform var(--dur-press) var(--ease-out);
+  }
+
+  .button:active:not(:disabled) {
+    transform: scale(0.98);
+  }
 }
 
 .button:disabled {
   cursor: not-allowed;
-  opacity: 0.55;
+  opacity: 0.5;
 }
 
 .primary {
@@ -32,25 +48,27 @@
 }
 
 .secondary {
-  background: var(--surface);
+  background: transparent;
   color: var(--ink);
   border-color: var(--rule-strong);
 }
 
 .secondary:hover:not(:disabled) {
-  border-color: var(--ink);
+  border-color: var(--ink-2);
+  background: var(--panel-2);
 }
 
 .quiet {
   background: transparent;
   color: var(--ink-2);
   padding: 0 var(--space-2);
-  min-height: 32px;
+  min-height: 36px;
 }
 
 .quiet:hover:not(:disabled) {
   color: var(--ink);
   text-decoration: underline;
+  text-underline-offset: 0.2em;
 }
 
 .large {
@@ -59,11 +77,18 @@
   padding: 0 var(--space-5);
 }
 
+/* Panels: raised graphite for things to work in; dashed and sunk for the demo harness. */
 .panel {
-  background: var(--surface);
+  background: var(--panel);
   border: 1px solid var(--rule);
-  border-radius: var(--radius-panel);
+  border-radius: var(--radius-l);
   padding: var(--space-5);
+}
+
+.harness {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--rule-strong);
 }
 
 .panelHeader {
@@ -78,16 +103,19 @@
   color: var(--ink-2);
   font-size: var(--text-sm);
   margin-top: var(--space-1);
+  max-width: var(--measure);
 }
 
+/* Form fields */
 .field {
   display: grid;
   gap: var(--space-1);
+  min-width: 0;
 }
 
 .label {
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .hint {
@@ -97,15 +125,35 @@
 
 .input {
   width: 100%;
-  min-height: 40px;
+  min-height: 42px;
   padding: var(--space-2) var(--space-3);
-  background: var(--surface);
+  background-color: var(--sunk);
+  color: var(--ink);
   border: 1px solid var(--rule-strong);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-m);
+  transition: border-color var(--dur-hover) ease;
+}
+
+.input::placeholder {
+  color: var(--ink-3);
 }
 
 .input:hover {
   border-color: var(--ink-3);
+}
+
+.input:focus-visible {
+  border-color: var(--focus);
+  outline-offset: 1px;
+}
+
+.input[aria-invalid="true"] {
+  border-color: var(--failing-line);
+}
+
+select.input option {
+  background-color: var(--panel);
+  color: var(--ink);
 }
 
 textarea.input {
@@ -113,17 +161,18 @@ textarea.input {
   resize: vertical;
 }
 
+/* Notices: a tinted ground and a full outline, never a side stripe. */
 .notice {
   display: flex;
-  gap: var(--space-2);
+  gap: var(--space-3);
   align-items: flex-start;
   padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-panel);
-  border-left: 4px solid currentColor;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-m);
   font-size: var(--text-sm);
 }
 
-.notice > svg {
+.noticeIcon {
   flex: none;
   margin-top: 2px;
 }
@@ -133,59 +182,76 @@ textarea.input {
 }
 
 .danger {
-  color: var(--danger);
-  background: var(--danger-fill);
+  background: var(--failing-fill);
+  border-color: var(--failing-line);
+}
+
+.danger .noticeIcon {
+  color: var(--failing);
 }
 
 .info {
+  background: var(--panel);
+}
+
+.info .noticeIcon {
   color: var(--ink-2);
-  background: var(--surface-sunk);
 }
 
 .attention {
-  color: var(--gate-ink);
-  background: var(--gate-fill);
+  background: var(--degraded-fill);
+  border-color: var(--degraded-line);
+}
+
+.attention .noticeIcon {
+  color: var(--degraded);
 }
 
 .noticeBody {
   color: var(--ink);
+  min-width: 0;
+  max-width: var(--measure);
+  overflow-wrap: anywhere;
 }
 
+/* Empty states teach the next step. */
 .empty {
   display: grid;
   gap: var(--space-2);
   justify-items: start;
   padding: var(--space-6) var(--space-5);
-  border: 1px dashed var(--rule-strong);
-  border-radius: var(--radius-panel);
-  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-m);
+}
+
+.emptyTitle {
+  font-size: var(--text-lg);
 }
 
 .empty p {
   color: var(--ink-2);
-  max-width: 60ch;
+  max-width: var(--measure);
 }
 
 .skeleton {
   display: block;
   height: 14px;
-  border-radius: 2px;
-  background: linear-gradient(90deg, var(--rule) 0%, var(--surface-sunk) 50%, var(--rule) 100%);
-  background-size: 200% 100%;
-  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: var(--radius-s);
+  background: var(--panel-2);
+  animation: breathe 1.4s ease-in-out infinite alternate;
 }
 
-@keyframes shimmer {
+@keyframes breathe {
   from {
-    background-position: 200% 0;
+    opacity: 1;
   }
   to {
-    background-position: -200% 0;
+    opacity: 0.45;
   }
 }
 
 .spin {
-  animation: spin 1.1s linear infinite;
+  animation: spin 1s linear infinite;
 }
 
 @keyframes spin {

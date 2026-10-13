@@ -1,53 +1,60 @@
 /*
- * OpsPilot dashboard tokens.
- * Ink on cool paper; amber is reserved for the approval gate, the one place where a person
- * has to act. Status colors always come with a text label and an icon shape.
+ * OpsPilot dashboard tokens: a dark cockpit.
+ *
+ * Designed for the engineer paged at night, laptop open in a dark room: a dimmed graphite screen
+ * (lifted well clear of black) that stays quiet while nothing needs a person. Color only ever reports state, and always comes
+ * with a word and a glyph:
+ *   magenta  the agent's intent, held at the approval gate (borrowed from glass cockpits, where
+ *            magenta draws the path the automation means to fly)
+ *   green    healthy, done        amber  degraded, needs a look        red  failing
+ *   cyan     your input: the keyboard focus
+ * Neutrals carry a trace of the magenta so the surfaces belong to the same family.
  */
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 
-  --paper: #f2f4f6;
-  --surface: #ffffff;
-  --surface-sunk: #f6f8fa;
-  --ink: #15253a;
-  --ink-2: #46566a;
-  --ink-3: #58687a;
-  --rule: #d6dde5;
-  --rule-strong: #aebccb;
-  --focus: #1d5fb8;
+  --night: oklch(0.25 0.008 333);
+  --panel: oklch(0.29 0.009 333);
+  --panel-2: oklch(0.325 0.01 333);
+  --sunk: oklch(0.215 0.007 333);
+  --rule: oklch(0.375 0.011 333);
+  --rule-strong: oklch(0.585 0.012 333);
 
-  --gate-ink: #8a4500;
-  --gate-bar: #e0820c;
-  --gate-fill: #fff3e0;
+  --ink: oklch(0.95 0.005 333);
+  --ink-2: oklch(0.83 0.009 333);
+  --ink-3: oklch(0.745 0.011 333);
 
-  --active: #1a56a8;
-  --active-fill: #e8f0fb;
-  --attention: #8a4500;
-  --attention-fill: #fff3e0;
-  --success: #17683a;
-  --success-fill: #e5f3ea;
-  --info: #0c6470;
-  --info-fill: #e2f2f4;
-  --neutral: #4d5a67;
-  --neutral-fill: #edf0f3;
-  --danger: #a8231b;
-  --danger-fill: #fbe9e8;
+  /* Each state: the color itself (text, glyphs), a line for borders and a fill for tinted grounds. */
+  --intent: oklch(0.72 0.19 333);
+  --intent-line: oklch(0.6 0.16 333);
+  --intent-fill: oklch(0.32 0.05 333);
+  --healthy: oklch(0.82 0.135 150);
+  --healthy-line: oklch(0.62 0.11 150);
+  --healthy-fill: oklch(0.32 0.04 150);
+  --degraded: oklch(0.85 0.13 82);
+  --degraded-line: oklch(0.66 0.11 82);
+  --degraded-fill: oklch(0.33 0.045 82);
+  --failing: oklch(0.76 0.15 27);
+  --failing-line: oklch(0.62 0.13 27);
+  --failing-fill: oklch(0.33 0.06 27);
+  --focus: oklch(0.87 0.105 215);
 
-  --button-ink: #ffffff;
-  --button-fill: #15253a;
-  --button-fill-hover: #253a55;
+  --button-fill: var(--ink);
+  --button-fill-hover: oklch(0.985 0.004 333);
+  --button-ink: var(--night);
 
-  --font-body: var(--font-sans), "Segoe UI", system-ui, sans-serif;
+  --font-ui: var(--font-sans), "Segoe UI", system-ui, sans-serif;
   --font-code: var(--font-mono), ui-monospace, "SF Mono", Menlo, monospace;
 
+  /* Fixed scale, about 1.2 between steps. B612 runs large for its size. */
   --text-xs: 0.8125rem;
-  --text-sm: 0.9375rem;
+  --text-sm: 0.875rem;
   --text-base: 1rem;
   --text-lg: 1.1875rem;
-  --text-xl: 1.5rem;
-  --text-2xl: 2rem;
-  --text-display: 2.75rem;
+  --text-xl: 1.4375rem;
+  --text-2xl: 1.75rem;
+  --text-version: 2rem;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -56,58 +63,33 @@
   --space-5: 24px;
   --space-6: 32px;
   --space-7: 48px;
+  --space-8: 64px;
 
-  --radius-control: 6px;
-  --radius-panel: 3px;
-  --page-width: 1240px;
+  --radius-s: 3px;
+  --radius-m: 6px;
+  --radius-l: 10px;
+
+  --page-width: 1280px;
   --gutter: 24px;
+  /* B612's zero is wide: 60ch is about 78 average characters. */
+  --measure: 60ch;
 
-  /* The gate's hazard band: a physical barrier, drawn quietly. */
-  --hazard: repeating-linear-gradient(-45deg, var(--gate-bar) 0 6px, transparent 6px 12px);
-}
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --dur-press: 120ms;
+  --dur-hover: 120ms;
+  --dur-state: 200ms;
+  --dur-move: 280ms;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-
-    --paper: #0f1722;
-    --surface: #172230;
-    --surface-sunk: #121c28;
-    --ink: #e6edf5;
-    --ink-2: #b3c0cf;
-    --ink-3: #97a5b6;
-    --rule: #2a3a4e;
-    --rule-strong: #43566e;
-    --focus: #7fb0ff;
-
-    --gate-ink: #ffb65e;
-    --gate-bar: #d87c0b;
-    --gate-fill: #2e2211;
-
-    --active: #9cc2ff;
-    --active-fill: #172a44;
-    --attention: #ffb65e;
-    --attention-fill: #2e2211;
-    --success: #86d9a6;
-    --success-fill: #12291c;
-    --info: #7dd3de;
-    --info-fill: #0f2a2f;
-    --neutral: #b3c0cf;
-    --neutral-fill: #1f2a37;
-    --danger: #ff9f97;
-    --danger-fill: #341a1a;
-
-    --button-ink: #0f1722;
-    --button-fill: #e6edf5;
-    --button-fill-hover: #c9d5e2;
-  }
+  --z-skip: 10;
 }
 
 @media (max-width: 640px) {
   :root {
     --gutter: 16px;
     --text-2xl: 1.625rem;
-    --text-display: 2.25rem;
+    --text-xl: 1.3125rem;
+    --text-version: 1.625rem;
   }
 }
 
@@ -119,17 +101,21 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  background: var(--night);
 }
 
 body {
   margin: 0;
-  background: var(--paper);
+  min-height: 100dvh;
+  background: var(--night);
   color: var(--ink);
-  font-family: var(--font-body);
+  font-family: var(--font-ui);
   font-size: var(--text-base);
-  line-height: 1.5;
+  /* Light text on dark reads heavier and tighter: a little more leading than usual. */
+  line-height: 1.55;
   font-kerning: normal;
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
 }
 
 h1,
@@ -137,14 +123,13 @@ h2,
 h3,
 h4 {
   margin: 0;
-  line-height: 1.2;
-  font-weight: 650;
-  letter-spacing: -0.005em;
+  line-height: 1.25;
+  font-weight: 700;
+  text-wrap: balance;
 }
 
 h1 {
   font-size: var(--text-2xl);
-  font-weight: 700;
 }
 
 h2 {
@@ -157,19 +142,25 @@ h3 {
 
 p {
   margin: 0;
+  text-wrap: pretty;
 }
 
 a {
   color: inherit;
-  text-underline-offset: 0.18em;
+  text-underline-offset: 0.2em;
   text-decoration-thickness: 1px;
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
 }
 
 code,
 pre,
 kbd {
   font-family: var(--font-code);
-  font-size: 0.875em;
+  font-size: 0.9375em;
+  font-variant-ligatures: none;
 }
 
 button,
@@ -180,13 +171,18 @@ textarea {
   color: inherit;
 }
 
+button {
+  touch-action: manipulation;
+}
+
 :focus-visible {
-  outline: 3px solid var(--focus);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--focus) 25%, transparent);
+  background: var(--intent-fill);
+  color: var(--ink);
 }
 
 .visually-hidden {
@@ -205,12 +201,16 @@ textarea {
   font-variant-numeric: tabular-nums;
 }
 
+/*
+ * Reduced motion: no keyframe motion anywhere. Movement (transforms) is only ever declared inside
+ * prefers-reduced-motion: no-preference, so the color and opacity changes that report state stay.
+ */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

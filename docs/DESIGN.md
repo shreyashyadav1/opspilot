@@ -335,6 +335,10 @@ incident list (pending decisions first) with the start form and the demo fault p
 investigation page, with a live timeline in which the approval gate is drawn across the steps,
 the diagnosis, and the decision panel; and the benchmark browser, which lists only runs that
 exist and labels the playbook as a rule-based baseline and simulated runs as harness checks.
+The decision panel states a proposed rollback in the operator's terms: the running version and
+the one it returns to, the deploy it undoes and the config keys it puts back, all read from the
+agent's own deploy-history call (and, once it ran, from the tool's record of the rollback). The
+diagnosis links each piece of evidence to the numbered tool call it came from.
 
 ### 3.6 Observability (`observability/opspilot_observability`)
 

@@ -46,6 +46,7 @@ describe("StartInvestigationForm", () => {
     await user.type(screen.getByLabelText("Alert"), "x");
     await user.click(screen.getByRole("button", { name: "Start investigation" }));
     expect(screen.getByRole("alert")).toHaveTextContent("at least 3 characters");
+    expect(screen.getByLabelText("Alert")).toHaveFocus();
     expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
   });
 

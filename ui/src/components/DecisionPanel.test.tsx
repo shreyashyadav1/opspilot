@@ -2,7 +2,13 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { executed, investigation, rejected } from "@/test/fixtures";
+import {
+  executed,
+  executedWithRecord,
+  investigation,
+  rejected,
+  withDeployHistory,
+} from "@/test/fixtures";
 import { mockApi } from "@/test/utils";
 
 import { DecisionPanel } from "./DecisionPanel";
@@ -66,6 +72,67 @@ describe("DecisionPanel", () => {
 
     rerender(<DecisionPanel investigation={executed()} onDecided={() => {}} />);
     expect(screen.getByRole("status")).toHaveTextContent("orders rolled back from 1.8.4 to 1.8.3.");
+  });
+
+  it("says exactly what the rollback changes, from the agent's own evidence", () => {
+    render(<DecisionPanel investigation={withDeployHistory()} onDecided={() => {}} />);
+    expect(
+      screen.getByRole("heading", { name: "Roll orders back from 1.8.4 to 1.8.3?" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Undoes the deploy s\.patel shipped at/)).toBeInTheDocument();
+    expect(
+      screen.getByText("Route payment calls through the new payments endpoint"),
+    ).toBeInTheDocument();
+    const config = screen.getByText("payments.base-url").closest("dl");
+    expect(config).toHaveTextContent("payments.base-url");
+    expect(config).toHaveTextContent("Nowhttp://payments-v2:8080");
+    expect(config).toHaveTextContent("Afterhttp://payments:8080");
+    expect(
+      screen.getByRole("link", { name: /^Versions read at [\d:]+ in call 2 of the timeline$/ }),
+    ).toHaveAttribute("href", "#call-4");
+    expect(screen.getByText("Rolls orders back to 1.8.3 now.")).toBeInTheDocument();
+  });
+
+  it("says so when no tool call reported the versions", () => {
+    render(<DecisionPanel investigation={investigation()} onDecided={() => {}} />);
+    expect(
+      screen.getByRole("heading", { name: "Approve the rollback of orders?" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/did not report the versions/)).toBeInTheDocument();
+    expect(screen.getByText("Rolls orders back now.")).toBeInTheDocument();
+  });
+
+  it("describes an executed rollback from the tool's own record", () => {
+    render(<DecisionPanel investigation={executedWithRecord()} onDecided={() => {}} />);
+    expect(screen.getByRole("heading", { name: "Rollback approved" })).toBeInTheDocument();
+    expect(screen.getByText("orders was rolled back from 1.8.4 to 1.8.3.")).toBeInTheDocument();
+    expect(screen.getByText("reported by the tool")).toBeInTheDocument();
+  });
+
+  it("says when a decision would be recorded without a name", async () => {
+    // An earlier test remembered "alice" as the reviewer.
+    window.localStorage.removeItem("opspilot.reviewer");
+    const user = userEvent.setup();
+    render(<DecisionPanel investigation={investigation()} onDecided={() => {}} />);
+    expect(screen.getByLabelText("Your name")).toHaveAccessibleDescription(
+      "Recorded as “operator” unless you add your name.",
+    );
+    await user.clear(screen.getByLabelText("Your name"));
+    await user.type(screen.getByLabelText("Your name"), "alice");
+    expect(screen.queryByText(/unless you add your name/)).not.toBeInTheDocument();
+  });
+
+  it("asks before a reload throws away an unsent note", async () => {
+    const user = userEvent.setup();
+    render(<DecisionPanel investigation={investigation()} onDecided={() => {}} />);
+    const reload = () => {
+      const event = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    expect(reload()).toBe(false);
+    await user.type(screen.getByLabelText(/Note/), "Matches the deploy diff");
+    expect(reload()).toBe(true);
   });
 
   it("renders nothing when no action needs approval", () => {

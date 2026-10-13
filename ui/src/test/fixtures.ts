@@ -216,6 +216,91 @@ export function executed(): InvestigationDetail {
   });
 }
 
+/** What get_recent_deploys returns: the orders deploy that broke checkout, and an older one. */
+export const DEPLOY_HISTORY = {
+  since_minutes: 60,
+  deploys: [
+    {
+      id: "dep-0007",
+      service: "orders",
+      kind: "deploy",
+      version: "1.8.4",
+      previous_version: "1.8.3",
+      deployed_at: at(-246),
+      author: "s.patel",
+      change_summary: "Route payment calls through the new payments endpoint",
+      config_diff: {
+        "payments.base-url": { from: "http://payments:8080", to: "http://payments-v2:8080" },
+      },
+    },
+    {
+      id: "dep-0005",
+      service: "payments",
+      kind: "deploy",
+      version: "3.2.1",
+      previous_version: "3.2.0",
+      deployed_at: at(-1800),
+      author: "j.okafor",
+      change_summary: "Tune retry backoff",
+      config_diff: {},
+    },
+  ],
+};
+
+/** The pending investigation, but with a deploy-history call that succeeded. */
+export function withDeployHistory(
+  overrides: Partial<InvestigationDetail> = {},
+): InvestigationDetail {
+  const trace = pendingTrace().map((event): TraceEvent => {
+    if (event.kind !== "tool_call" || event.data.tool !== "get_recent_deploys") return event;
+    return {
+      ...event,
+      data: {
+        ...event.data,
+        ok: true,
+        error: null,
+        summary: "2 events. Latest: orders deploy 1.8.4 by s.patel (payments.base-url).",
+        output: DEPLOY_HISTORY,
+      },
+    };
+  });
+  return investigation({ trace, ...overrides });
+}
+
+/** Executed, with the rollback event the tool reports back. */
+export function executedWithRecord(): InvestigationDetail {
+  const base = executed();
+  const result = {
+    ...base.action_result!,
+    output: {
+      status: "rolled_back",
+      event: {
+        id: "dep-0008",
+        service: "orders",
+        kind: "rollback",
+        version: "1.8.3",
+        previous_version: "1.8.4",
+        deployed_at: at(22),
+        author: "opspilot",
+        change_summary: "Rollback 1.8.4 -> 1.8.3: Revert the deploy that introduced the failures.",
+        config_diff: {
+          "payments.base-url": { from: "http://payments-v2:8080", to: "http://payments:8080" },
+        },
+      },
+    },
+  };
+  return withDeployHistory({
+    ...base,
+    action_result: result,
+    trace: [
+      ...withDeployHistory().trace,
+      ...base.trace
+        .slice(pendingTrace().length)
+        .map((event) => (event.kind === "action" ? { ...event, data: result } : event)),
+    ],
+  });
+}
+
 export function summary(overrides: Partial<InvestigationSummary> = {}): InvestigationSummary {
   const detail = investigation();
   return {

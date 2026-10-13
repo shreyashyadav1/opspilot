@@ -3,24 +3,38 @@
 import { useEffect, useId, useRef, useState } from "react";
 
 import { ApiError, api } from "@/lib/api";
+import { rollbackPlan, type RollbackPlan } from "@/lib/change";
 import { actionLabel, clockTime, percent } from "@/lib/format";
 import { useStoredValue } from "@/lib/hooks";
-import { gateState, type GateState } from "@/lib/timeline";
+import { callNumbers, gateState, type GateState } from "@/lib/timeline";
 import type { InvestigationDetail } from "@/lib/types";
 
+import { ChangeTrack } from "./ChangeTrack";
 import { GateMark } from "./GateMark";
+import { Signature } from "./Signature";
 import { Button, Notice, uiStyles } from "./ui";
 import styles from "./DecisionPanel.module.css";
+
+const RUNS: Record<GateState, string> = {
+  pending: "Runs",
+  executing: "Running",
+  executed: "Ran",
+  failed: "Tried to run",
+  rejected: "Would have run",
+};
 
 function verb(tool: string): string {
   return tool === "rollback_deploy" ? "rollback" : "action";
 }
 
-function title(state: GateState, noun: string, target: string): string {
+function title(state: GateState, noun: string, target: string, plan: RollbackPlan | null): string {
   const Noun = noun.charAt(0).toUpperCase() + noun.slice(1);
   switch (state) {
     case "pending":
-      return `Approve the ${noun} of ${target}?`;
+      // The question says exactly what approving does, when the evidence says it.
+      return plan?.from && plan.to
+        ? `Roll ${target} back from ${plan.from} to ${plan.to}?`
+        : `Approve the ${noun} of ${target}?`;
     case "rejected":
       return `${Noun} rejected`;
     case "failed":
@@ -31,8 +45,9 @@ function title(state: GateState, noun: string, target: string): string {
 }
 
 /**
- * The approval gate as a control. The agent proposes; only this decision can let the
- * proposed action run. After a decision the panel reports what happened.
+ * The approval gate as a control. The agent proposes; only this decision can let the proposed
+ * action run. It states exactly what would change (service, versions, config) from the agent's own
+ * evidence, and after a decision reports what happened.
  */
 export function DecisionPanel({
   investigation,
@@ -57,9 +72,21 @@ export function DecisionPanel({
     previous.current = state;
   }, [state]);
 
+  // A note typed for a pending decision is not thrown away by a stray reload or tab close.
+  const unsent = state === "pending" && comment.trim() !== "";
+  useEffect(() => {
+    if (!unsent) return;
+    const keep = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", keep);
+    return () => window.removeEventListener("beforeunload", keep);
+  }, [unsent]);
+
   if (!request || !state) return null;
   const action = request.action;
   const noun = verb(request.tool);
+  const plan = rollbackPlan(investigation);
+  const numbers = callNumbers(investigation.trace);
+  const alertAt = investigation.trace[0]?.at ?? investigation.created_at;
 
   async function decide(decision: "approve" | "reject") {
     setSubmitting(decision);
@@ -72,13 +99,18 @@ export function DecisionPanel({
       });
       onDecided(updated);
     } catch (exc) {
-      setError(exc instanceof ApiError ? exc.message : "The decision could not be sent.");
+      setError(
+        exc instanceof ApiError
+          ? `${exc.message} Reload the page to see where this investigation stands.`
+          : "The decision could not be sent. Check that the agent API is running, then try again.",
+      );
     } finally {
       setSubmitting(null);
     }
   }
 
   const approval = investigation.approval;
+  const anonymous = (reviewer.trim() || "operator") === "operator";
   const actionEvent = [...investigation.trace].reverse().find((event) => event.kind === "action");
 
   return (
@@ -88,117 +120,144 @@ export function DecisionPanel({
       aria-labelledby={`${ids}-title`}
       tabIndex={-1}
     >
-      <div className={styles.strip} aria-hidden="true" />
-      <div className={styles.inner}>
-        <div className={styles.heading}>
-          <GateMark className={styles.mark} />
-          <h2 id={`${ids}-title`}>{title(state, noun, action.target_service)}</h2>
+      <div className={styles.heading}>
+        <GateMark className={styles.mark} />
+        <h2 id={`${ids}-title`}>{title(state, noun, action.target_service, plan)}</h2>
+      </div>
+
+      {plan ? (
+        <ChangeTrack
+          plan={plan}
+          state={state}
+          alertAt={alertAt}
+          callNumber={plan.sourceSeq === null ? null : (numbers.get(plan.sourceSeq) ?? null)}
+          callAt={investigation.trace.find((event) => event.seq === plan.sourceSeq)?.at ?? null}
+        />
+      ) : (
+        <p className={styles.generic}>
+          {actionLabel(action.type)} of <strong>{action.target_service}</strong>
+        </p>
+      )}
+
+      <dl className={styles.facts}>
+        <div>
+          <dt>{RUNS[state]}</dt>
+          <dd>
+            <Signature tool={request.tool} args={{ service: action.target_service }} />
+          </dd>
         </div>
+        <div>
+          <dt>Why</dt>
+          <dd>{action.rationale}</dd>
+        </div>
+        <div>
+          <dt>Agent confidence</dt>
+          <dd className="numeric">{percent(request.confidence)}</dd>
+        </div>
+      </dl>
 
-        <dl className={styles.facts}>
-          <div>
-            <dt>Proposed action</dt>
-            <dd>
-              {actionLabel(action.type)} of <strong>{action.target_service}</strong>
-              <code className={styles.tool}>{request.tool}</code>
-            </dd>
-          </div>
-          <div>
-            <dt>Why</dt>
-            <dd>{action.rationale}</dd>
-          </div>
-          <div>
-            <dt>Agent confidence</dt>
-            <dd className="numeric">{percent(request.confidence)}</dd>
-          </div>
-        </dl>
-
-        {state === "pending" ? (
-          <>
-            <p className={styles.explain}>
-              The agent cannot run this itself. Nothing changes until someone approves; rejecting
-              ends the investigation without touching the system.
-            </p>
-            <div className={styles.fields}>
-              <div className={uiStyles.field}>
-                <label htmlFor={`${ids}-reviewer`} className={uiStyles.label}>
-                  Your name
-                </label>
-                <input
-                  id={`${ids}-reviewer`}
-                  className={uiStyles.input}
-                  value={reviewer}
-                  maxLength={64}
-                  autoComplete="name"
-                  onChange={(event) => setReviewer(event.target.value)}
-                />
-              </div>
-              <div className={uiStyles.field}>
-                <label htmlFor={`${ids}-comment`} className={uiStyles.label}>
-                  Note <span className={styles.optional}>(optional)</span>
-                </label>
-                <textarea
-                  id={`${ids}-comment`}
-                  className={uiStyles.input}
-                  value={comment}
-                  maxLength={500}
-                  rows={2}
-                  onChange={(event) => setComment(event.target.value)}
-                />
-              </div>
+      {state === "pending" ? (
+        <>
+          <div className={styles.fields}>
+            <div className={uiStyles.field}>
+              <label htmlFor={`${ids}-reviewer`} className={uiStyles.label}>
+                Your name
+              </label>
+              <input
+                id={`${ids}-reviewer`}
+                name="reviewer"
+                className={uiStyles.input}
+                value={reviewer}
+                maxLength={64}
+                autoComplete="name"
+                spellCheck={false}
+                onChange={(event) => setReviewer(event.target.value)}
+                aria-describedby={anonymous ? `${ids}-reviewer-hint` : undefined}
+              />
             </div>
-            {error ? (
-              <Notice tone="danger" role="alert">
-                <p>{error}</p>
-              </Notice>
-            ) : null}
-            <div className={styles.buttons}>
-              <Button
-                variant="primary"
-                size="large"
-                onClick={() => void decide("approve")}
-                disabled={submitting !== null}
-                aria-describedby={`${ids}-title`}
-              >
-                {submitting === "approve" ? "Approving..." : `Approve ${noun}`}
-              </Button>
-              <Button
-                variant="secondary"
-                size="large"
-                className={styles.reject}
-                onClick={() => void decide("reject")}
-                disabled={submitting !== null}
-              >
-                {submitting === "reject" ? "Rejecting..." : "Reject"}
-              </Button>
+            <div className={uiStyles.field}>
+              <label htmlFor={`${ids}-comment`} className={uiStyles.label}>
+                Note <span className={styles.optional}>(optional)</span>
+              </label>
+              <textarea
+                id={`${ids}-comment`}
+                name="comment"
+                className={uiStyles.input}
+                value={comment}
+                maxLength={500}
+                rows={1}
+                autoComplete="off"
+                onChange={(event) => setComment(event.target.value)}
+              />
             </div>
-          </>
-        ) : (
-          <div className={styles.outcome} ref={outcome} tabIndex={-1} role="status">
-            {approval ? (
-              <p className={styles.who}>
-                {approval.approved ? "Approved" : "Rejected"} by {approval.reviewer} at{" "}
-                <time dateTime={approval.decided_at}>{clockTime(approval.decided_at)}</time>.
-                {approval.comment ? (
-                  <span className={styles.note}> “{approval.comment}”</span>
-                ) : null}
+            {anonymous ? (
+              <p id={`${ids}-reviewer-hint`} className={`${uiStyles.hint} ${styles.wide}`}>
+                Recorded as “operator” unless you add your name.
               </p>
             ) : null}
-            <p className={styles.result}>
-              {state === "rejected" && "Nothing was executed."}
-              {state === "executing" && `Running the ${noun}...`}
-              {state === "executed" &&
-                (actionEvent?.kind === "action" && actionEvent.data.summary
-                  ? actionEvent.data.summary
-                  : "The action ran.")}
-              {state === "failed" &&
-                (investigation.error ??
-                  (actionEvent?.kind === "action" ? actionEvent.data.summary : null) ??
-                  "The action did not complete.")}
+          </div>
+          {error ? (
+            <Notice tone="danger" role="alert">
+              <p>{error}</p>
+            </Notice>
+          ) : null}
+          <div className={styles.buttons}>
+            <Button
+              variant="primary"
+              size="large"
+              onClick={() => void decide("approve")}
+              disabled={submitting !== null}
+              aria-describedby={`${ids}-title ${ids}-approve-effect`}
+            >
+              {submitting === "approve" ? "Approving…" : `Approve ${noun}`}
+            </Button>
+            <p id={`${ids}-approve-effect`} className={styles.effect}>
+              {request.tool === "rollback_deploy"
+                ? `Rolls ${action.target_service} back${plan?.to ? ` to ${plan.to}` : ""} now.`
+                : "Runs the action now."}
+            </p>
+            <Button
+              variant="secondary"
+              size="large"
+              onClick={() => void decide("reject")}
+              disabled={submitting !== null}
+              aria-describedby={`${ids}-reject-effect`}
+            >
+              {submitting === "reject" ? "Rejecting…" : "Reject"}
+            </Button>
+            <p id={`${ids}-reject-effect`} className={styles.effect}>
+              Ends the investigation. Nothing is changed.
             </p>
           </div>
-        )}
-      </div>
+        </>
+      ) : (
+        <div className={styles.outcome} ref={outcome} tabIndex={-1} role="status">
+          {approval ? (
+            <p className={styles.who}>
+              {approval.approved ? "Approved" : "Rejected"} by {approval.reviewer} at{" "}
+              <time dateTime={approval.decided_at}>{clockTime(approval.decided_at)}</time>.
+              {approval.comment ? (
+                <>
+                  {" "}
+                  <q className={styles.note}>{approval.comment}</q>
+                </>
+              ) : null}
+            </p>
+          ) : null}
+          <p className={styles.result}>
+            {state === "rejected" && "Nothing was executed."}
+            {state === "executing" && `Running the ${noun}…`}
+            {state === "executed" &&
+              (actionEvent?.kind === "action" && actionEvent.data.summary
+                ? actionEvent.data.summary
+                : "The action ran.")}
+            {state === "failed" &&
+              (investigation.error ??
+                (actionEvent?.kind === "action" ? actionEvent.data.summary : null) ??
+                "The action did not complete.")}
+          </p>
+        </div>
+      )}
     </section>
   );
 }

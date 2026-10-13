@@ -1,8 +1,13 @@
+import type { Metadata } from "next";
+
 import { DemoFaultPanel } from "@/components/DemoFaultPanel";
 import { IncidentList } from "@/components/IncidentList";
 import { StartInvestigationForm } from "@/components/StartInvestigationForm";
 
 import styles from "./page.module.css";
+
+// The root layout's title template only reaches child segments, so this page spells it out.
+export const metadata: Metadata = { title: { absolute: "Incidents | OpsPilot" } };
 
 export default function IncidentsPage() {
   return (

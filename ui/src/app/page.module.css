@@ -1,6 +1,11 @@
 .page {
   display: grid;
   gap: var(--space-6);
+  min-width: 0;
+}
+
+.page > * {
+  min-width: 0;
 }
 
 .intro {
@@ -10,13 +15,13 @@
 
 .intro p {
   color: var(--ink-2);
-  max-width: 64ch;
+  max-width: var(--measure);
 }
 
 .columns {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 380px;
-  gap: var(--space-6);
+  gap: var(--space-7);
   align-items: start;
 }
 
@@ -27,10 +32,12 @@
 .aside {
   display: grid;
   gap: var(--space-5);
+  min-width: 0;
 }
 
 @media (max-width: 1080px) {
   .columns {
     grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-6);
   }
 }

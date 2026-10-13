@@ -1,7 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { LLM, investigation } from "@/test/fixtures";
+import { LLM, investigation, withDeployHistory } from "@/test/fixtures";
 
 import { DiagnosisPanel } from "./DiagnosisPanel";
 
@@ -27,6 +27,17 @@ describe("DiagnosisPanel", () => {
     render(<DiagnosisPanel investigation={withCost} />);
     expect(screen.getByText(/Cost: \$0\.0002/)).toBeInTheDocument();
     expect(screen.queryByText(/rule-based baseline/)).not.toBeInTheDocument();
+  });
+
+  it("links each piece of evidence to the tool call it came from", () => {
+    render(<DiagnosisPanel investigation={withDeployHistory()} />);
+    const items = screen.getAllByRole("listitem");
+    expect(items[0]).toHaveTextContent("Deploys");
+    expect(
+      within(items[0]!).getByRole("link", { name: /^Call 2 in the timeline/ }),
+    ).toHaveAttribute("href", "#call-4");
+    // No search_logs call ran, so the log evidence is not pinned to any call.
+    expect(within(items[1]!).queryByRole("link")).not.toBeInTheDocument();
   });
 
   it("reports an unpriced model's cost as not available", () => {

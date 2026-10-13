@@ -1,6 +1,7 @@
 .page {
   display: grid;
-  gap: var(--space-5);
+  gap: var(--space-4);
+  min-width: 0;
 }
 
 .back {
@@ -8,8 +9,8 @@
   align-items: center;
   gap: var(--space-1);
   width: fit-content;
+  min-height: 32px;
   font-size: var(--text-sm);
-  font-weight: 600;
   color: var(--ink-2);
   text-decoration: none;
 }
@@ -22,13 +23,14 @@
 .header {
   display: grid;
   gap: var(--space-3);
+  min-width: 0;
 }
 
 .titleRow {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-3) var(--space-4);
 }
 
 .titleRow h1 {
@@ -39,22 +41,49 @@
   margin: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2) var(--space-6);
+  gap: var(--space-3) var(--space-6);
+}
+
+.facts > div {
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .facts {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .facts > .wide {
+    grid-column: 1 / -1;
+  }
 }
 
 .facts dt {
   font-size: var(--text-xs);
   color: var(--ink-3);
-  font-weight: 600;
 }
 
 .facts dd {
   margin: 0;
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: 700;
 }
 
-.traceId {
+.code {
+  font-family: var(--font-code);
+  font-weight: 400;
+}
+
+.traceValue {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+}
+
+.traceValue code {
+  font-weight: 400;
   overflow-wrap: anywhere;
 }
 
@@ -69,6 +98,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
+  width: fit-content;
   font-size: var(--text-xs);
   color: var(--ink-3);
 }
@@ -77,41 +107,75 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--success);
+  background: var(--healthy);
 }
 
+/*
+ * One column on small screens, in reading order: the diagnosis, the next step (the decision, when
+ * one is held), then the trail. On wide screens the next step sits beside the diagnosis and the
+ * evidence it rests on, and stays in view while the trail scrolls.
+ */
 .columns {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 420px;
-  grid-template-areas: "main side";
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-6);
   align-items: start;
 }
 
-.side {
-  grid-area: side;
-  display: grid;
-  gap: var(--space-5);
+.side,
+.diagnosis,
+.trail {
+  min-width: 0;
 }
 
-.main {
-  grid-area: main;
-  min-width: 0;
+@media (min-width: 1080px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr) 460px;
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "diagnosis side"
+      "trail side";
+    column-gap: var(--space-7);
+  }
+
+  .noDiagnosis {
+    grid-template-rows: 1fr;
+    grid-template-areas: "trail side";
+  }
+
+  .side {
+    grid-area: side;
+  }
+
+  .diagnosis {
+    grid-area: diagnosis;
+  }
+
+  .trail {
+    grid-area: trail;
+  }
+}
+
+/* Keep the next step in view while reading the trail, when the screen is tall enough for all
+   of it; a sticky panel taller than the viewport would hide its own buttons. */
+@media (min-width: 1080px) and (min-height: 760px) {
+  .side {
+    position: sticky;
+    top: var(--space-4);
+  }
+}
+
+/* The status, when a decision is waiting, doubles as a jump to it. */
+.badgeLink {
+  border-radius: var(--radius-s);
+  text-decoration: none;
 }
 
 .loading {
   display: grid;
   gap: var(--space-3);
   padding: var(--space-5);
-  background: var(--surface);
+  background: var(--panel);
   border: 1px solid var(--rule);
-}
-
-@media (max-width: 1080px) {
-  .columns {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      "side"
-      "main";
-  }
+  border-radius: var(--radius-l);
 }

@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { categoryLabel, relativeTime } from "@/lib/format";
+import { actionLabel, categoryLabel, percent, relativeTime } from "@/lib/format";
 import { useInvestigations } from "@/lib/hooks";
-import type { InvestigationSummary } from "@/lib/types";
+import type { InvestigationSummary, ProposedActionBrief } from "@/lib/types";
 
 import { StatusBadge } from "./StatusBadge";
 import { EmptyState, Notice, Skeleton } from "./ui";
@@ -21,6 +21,18 @@ function useNow(intervalMs = 30_000) {
   return now;
 }
 
+/** What the agent wants to do, in a few words, for the rows waiting on a decision. */
+function proposal(action: ProposedActionBrief): string {
+  switch (action.type) {
+    case "rollback_deploy":
+      return `Proposes rolling back ${action.target_service}`;
+    case "restart_service":
+      return `Proposes restarting ${action.target_service}`;
+    default:
+      return `Proposes: ${actionLabel(action.type).toLowerCase()} (${action.target_service})`;
+  }
+}
+
 function Row({ item, now }: { item: InvestigationSummary; now: number }) {
   const pending = item.status === "awaiting_approval";
   return (
@@ -29,12 +41,21 @@ function Row({ item, now }: { item: InvestigationSummary; now: number }) {
         <StatusBadge status={item.status} />
       </div>
       <div className={styles.alert}>
-        <Link href={`/investigations/${item.id}`} className={styles.link}>
+        {/* Alert titles repeat; the description (where it fired, its id) tells the links apart. */}
+        <Link
+          href={`/investigations/${item.id}`}
+          className={styles.link}
+          aria-describedby={`${item.id}-meta`}
+        >
           {item.alert.title}
         </Link>
-        <p className={styles.meta}>
-          {item.alert.service ? `Fired on ${item.alert.service}` : "Service not specified"}
-          <span className={styles.id}>{item.id}</span>
+        <p className={styles.meta} id={`${item.id}-meta`}>
+          <span>
+            {item.alert.service ? `Fired on ${item.alert.service}` : "Service not specified"}
+          </span>
+          <span className={styles.id} translate="no">
+            {item.id}
+          </span>
         </p>
       </div>
       <div className={styles.cause}>
@@ -52,6 +73,12 @@ function Row({ item, now }: { item: InvestigationSummary; now: number }) {
           {relativeTime(item.created_at, now)}
         </time>
       </div>
+      {pending && item.proposed_action ? (
+        <p className={styles.proposal}>
+          {proposal(item.proposed_action)}
+          {item.confidence !== null ? `, ${percent(item.confidence)} confident.` : "."}
+        </p>
+      ) : null}
     </li>
   );
 }

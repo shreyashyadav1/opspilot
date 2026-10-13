@@ -30,26 +30,35 @@
   padding: 0;
   list-style: none;
   display: grid;
-  gap: var(--space-2);
 }
 
 .fault {
   display: flex;
   justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-3);
-  border: 1px solid var(--rule);
-  border-radius: var(--radius-panel);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--rule);
   font-size: var(--text-sm);
 }
 
+.fault:last-child {
+  border-bottom: 1px solid var(--rule);
+}
+
+/* A fault still injected: the demo system is failing on purpose. */
 .active {
-  border-color: var(--rule-strong);
-  box-shadow: inset 3px 0 0 var(--danger);
+  padding-left: var(--space-3);
+  padding-right: var(--space-2);
+  border: 1px solid var(--failing-line);
+  border-radius: var(--radius-m);
+}
+
+.active + .fault {
+  border-top-color: transparent;
 }
 
 .faultTitle {
-  font-weight: 650;
+  font-weight: 700;
 }
 
 .faultMeta {
@@ -60,6 +69,14 @@
   color: var(--ink-3);
 }
 
+.active .faultMeta {
+  color: var(--ink-2);
+}
+
+.faultMeta > :first-child {
+  font-family: var(--font-code);
+}
+
 .faultState {
   display: flex;
   align-items: center;
@@ -68,9 +85,12 @@
 }
 
 .activeLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   font-size: var(--text-xs);
-  font-weight: 650;
-  color: var(--danger);
+  font-weight: 700;
+  color: var(--failing);
 }
 
 .resolved {
@@ -78,6 +98,11 @@
   max-width: 45%;
   text-align: right;
   font-size: var(--text-xs);
-  color: var(--success);
-  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.resolvedIcon {
+  color: var(--healthy);
+  vertical-align: -2px;
+  margin-right: var(--space-1);
 }
