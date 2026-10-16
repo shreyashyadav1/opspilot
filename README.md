@@ -50,7 +50,7 @@ flowchart LR
 | Demo system | [`demo-system/`](demo-system) | storefront and payments (FastAPI), orders (Spring Boot 3.5, Java 21, HikariCP, Postgres), JSON logs with trace ids, Prometheus metrics with identical names across languages, five injectable fault types |
 | MCP server | [`mcp-servers/`](mcp-servers/opspilot_mcp) | Official Python `mcp` SDK. `get_service_health`, `query_metric`, `search_logs`, `get_recent_deploys` (read-only) and `rollback_deploy` (destructive). Live and simulated backends |
 | Agent | [`agent/`](agent/opspilot_agent) | LangGraph graph with a bounded investigation loop, a Pydantic-validated `Diagnosis`, and an `interrupt()`-based approval gate |
-| Benchmark | [`evals/`](evals) | 11 YAML scenarios, runner, scorer, JSON and Markdown reports |
+| Benchmark | [`evals/`](evals) | 26 YAML scenarios, runner, scorer, JSON and Markdown reports |
 | Agent API | [`api/`](api/opspilot_api) | FastAPI. Runs investigations in the background, streams them over Server-Sent Events, keeps pending approvals in a LangGraph SQLite checkpoint across restarts |
 | Dashboard | [`ui/`](ui) | Next.js App Router and TypeScript. Incident list, investigation timeline with the approval gate, approve and reject, demo fault injection, benchmark browser |
 
@@ -164,7 +164,9 @@ Each scenario in [`evals/scenarios/`](evals/scenarios) names a fault, the alert 
 and the expected root cause and action. For every scenario the runner:
 
 1. resets the system and lets healthy traffic run for a cool-down period,
-2. applies distractors (for example a harmless deploy of another service shortly before),
+2. applies distractors: deploys near the incident that did not cause it, either code-only or
+   with a harmless config change, sometimes on the faulty service itself but well before
+   the symptoms start,
 3. injects the fault through the control plane, which records the ground truth
    (service and category),
 4. runs the agent on the alert; approval requests are answered by a policy

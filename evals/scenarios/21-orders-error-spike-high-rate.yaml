@@ -1,0 +1,23 @@
+id: orders-error-spike-high-rate
+title: Most order creations fail in orders, with a payments deploy nearby
+description: >
+  80% of order creations fail with a NullPointerException in the pricing code. Payments
+  traffic collapses as a side effect, and payments deployed a library upgrade just as the
+  errors began, so it is tempting to blame payments.
+alert:
+  title: Checkout error rate above SLO
+  service: storefront
+  details: POST /checkout is returning 502 Bad Gateway for most requests.
+fault:
+  type: error_spike
+  target: orders
+  params: {error_rate: 0.8}
+distractors:
+  - {type: benign_deploy, service: payments, minutes_ago: 4}
+expected:
+  root_cause_service: orders
+  category: error_rate
+  action: {type: escalate, target_service: orders}
+relevant_services: [orders, storefront, payments]
+required_evidence:
+  - {tool: search_logs, service: orders}

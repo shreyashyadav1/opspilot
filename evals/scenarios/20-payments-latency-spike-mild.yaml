@@ -1,0 +1,20 @@
+id: payments-latency-spike-mild
+title: Payments is a little slower than usual
+description: >
+  Charges take about 400 ms longer. Storefront p95 crosses the SLO only because the delay
+  adds up across two hops; no service is anywhere near a timeout.
+alert:
+  title: Checkout p95 latency above SLO
+  service: storefront
+  details: POST /checkout p95 latency is just above the 800 ms SLO.
+fault:
+  type: latency_spike
+  target: payments
+  params: {delay_ms: 400, jitter_ms: 80}
+expected:
+  root_cause_service: payments
+  category: latency
+  action: {type: escalate, target_service: payments}
+relevant_services: [payments, orders, storefront]
+required_evidence:
+  - {tool: query_metric, service: payments}

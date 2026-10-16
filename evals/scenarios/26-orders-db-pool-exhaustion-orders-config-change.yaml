@@ -1,0 +1,23 @@
+id: orders-db-pool-exhaustion-orders-config-change
+title: Orders pool exhaustion soon after an orders config change
+description: >
+  An export job leaks connections until the orders pool is empty. Orders shipped a config
+  change to its payments timeout 30 minutes earlier and stayed healthy for about 25 minutes after
+  it. Rolling it back would not free the pool; restarting orders would.
+alert:
+  title: Checkout error rate above SLO
+  service: storefront
+  details: POST /checkout 5xx rate is above the 2% SLO; latency is elevated too.
+fault:
+  type: db_pool_exhaustion
+  target: orders
+distractors:
+  - {type: config_deploy, service: orders, minutes_ago: 30}
+expected:
+  root_cause_service: orders
+  category: resource_exhaustion
+  action: {type: restart_service, target_service: orders}
+relevant_services: [orders, storefront]
+required_evidence:
+  - {tool: search_logs, service: orders}
+  - {tool: get_recent_deploys}

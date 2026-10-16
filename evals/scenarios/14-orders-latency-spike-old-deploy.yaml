@@ -1,0 +1,23 @@
+id: orders-latency-spike-old-deploy
+title: Orders slows down long after its last deploy
+description: >
+  Orders requests take about 1.1 s longer. Orders shipped a code-only deploy 45 minutes ago,
+  but its latency stayed flat for about 40 minutes after that, so the deploy is not the trigger.
+alert:
+  title: Checkout p95 latency above SLO
+  service: storefront
+  details: POST /checkout and GET /orders/{id} p95 latency is above the 800 ms SLO.
+fault:
+  type: latency_spike
+  target: orders
+  params: {delay_ms: 1100}
+distractors:
+  - {type: benign_deploy, service: orders, minutes_ago: 45}
+expected:
+  root_cause_service: orders
+  category: latency
+  action: {type: escalate, target_service: orders}
+relevant_services: [orders, storefront]
+required_evidence:
+  - {tool: query_metric, service: orders}
+  - {tool: get_recent_deploys}

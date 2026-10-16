@@ -1,0 +1,23 @@
+id: orders-bad-config-deploy-storefront-config-change
+title: Orders points at a payments host that does not exist, after a storefront config change
+description: >
+  Storefront raised its per-order item limit eight minutes ago. Orders then shipped a config
+  change that routes payment calls to payments-v2, a host that does not resolve. Storefront
+  sees the errors first, but the failing call is in orders.
+alert:
+  title: Checkout error rate above SLO
+  service: storefront
+  details: POST /checkout is returning 502 Bad Gateway for most requests.
+fault:
+  type: bad_config_deploy
+  target: orders
+distractors:
+  - {type: config_deploy, service: storefront, minutes_ago: 8}
+expected:
+  root_cause_service: orders
+  category: bad_deploy
+  action: {type: rollback_deploy, target_service: orders}
+relevant_services: [orders, storefront]
+required_evidence:
+  - {tool: get_recent_deploys}
+  - {tool: search_logs, service: orders}

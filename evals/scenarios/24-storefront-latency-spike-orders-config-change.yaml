@@ -1,0 +1,24 @@
+id: storefront-latency-spike-orders-config-change
+title: Storefront is slow, and orders just changed a timeout
+description: >
+  Storefront adds about 700 ms to its own requests. Orders shipped a config change to its
+  payments timeout five minutes earlier, which sounds related to latency but is not: orders
+  and payments latency is flat.
+alert:
+  title: Checkout p95 latency above SLO
+  service: storefront
+  details: POST /checkout and GET /products p95 latency is above the 800 ms SLO.
+fault:
+  type: latency_spike
+  target: storefront
+  params: {delay_ms: 700}
+distractors:
+  - {type: config_deploy, service: orders, minutes_ago: 9}
+expected:
+  root_cause_service: storefront
+  category: latency
+  action: {type: escalate, target_service: storefront}
+relevant_services: [storefront, orders]
+required_evidence:
+  - {tool: query_metric, service: storefront}
+  - {tool: query_metric, service: orders}

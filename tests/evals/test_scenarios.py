@@ -5,7 +5,10 @@ import yaml
 from pydantic import ValidationError
 
 from opsdemo.control_plane.chaos import ALLOWED_TARGETS, CATEGORY, FaultType
+from opsdemo.control_plane.deploys import BASELINES, BENIGN_CHANGES, DeployRequest
+from opspilot_evals.environments import distractor_deploy
 from opspilot_evals.scenario import FAULT_CATEGORY, Scenario, load_scenarios
+from opspilot_mcp.backends.simulated import HARMLESS_CONFIG_CHANGES, Distractor
 
 SCENARIOS = Path(__file__).resolve().parents[2] / "evals" / "scenarios"
 READ_TOOLS = {"get_service_health", "query_metric", "search_logs", "get_recent_deploys"}
@@ -16,10 +19,19 @@ def scenarios() -> list[Scenario]:
     return load_scenarios(SCENARIOS)
 
 
-def test_at_least_eight_unique_scenarios_covering_every_fault_type(scenarios):
-    assert len(scenarios) >= 8
+def test_unique_scenarios_cover_every_injectable_fault(scenarios):
+    assert len(scenarios) >= 25
     assert len({s.id for s in scenarios}) == len(scenarios)
-    assert {s.fault.type for s in scenarios} == set(FAULT_CATEGORY)
+    covered = {(s.fault.type, s.fault.target) for s in scenarios}
+    injectable = {(t.value, target) for t, targets in ALLOWED_TARGETS.items() for target in targets}
+    assert covered == injectable
+
+
+def test_scenarios_include_both_kinds_of_distractor(scenarios):
+    kinds = {d.type for s in scenarios for d in s.distractors}
+    assert kinds == {"benign_deploy", "config_deploy"}
+    # A distractor on the faulty service itself is the hardest case: it must not be the trigger.
+    assert any(d.service == s.fault.target for s in scenarios for d in s.distractors)
 
 
 def test_ground_truth_categories_match_the_control_plane():
@@ -49,3 +61,20 @@ def test_filtering_by_id(scenarios):
     assert [s.id for s in load_scenarios(SCENARIOS, ["payments-outage"])] == ["payments-outage"]
     with pytest.raises(ValueError, match="unknown scenario"):
         load_scenarios(SCENARIOS, ["nope"])
+
+
+def test_harmless_config_changes_start_from_the_live_baseline():
+    for service, (_, _, values) in HARMLESS_CONFIG_CHANGES.items():
+        for key, (old, _new) in values.items():
+            assert BASELINES[service].config[key] == old, (service, key)
+
+
+def test_live_distractor_deploys_match_the_simulation():
+    config = distractor_deploy(Distractor(type="config_deploy", service="orders", minutes_ago=9))
+    assert config["config"] == {"payments.timeout-ms": 3000}
+    assert config["minutes_ago"] == 9
+    benign = distractor_deploy(Distractor(service="payments"))
+    assert benign["config"] == {}
+    assert benign["change_summary"] == BENIGN_CHANGES["payments"].summary
+    for request in (config, benign):
+        DeployRequest.model_validate(request)
