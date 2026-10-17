@@ -8,6 +8,7 @@ import type {
   FaultType,
   InvestigationDetail,
   InvestigationSummary,
+  Me,
   ServiceConfig,
 } from "./types";
 
@@ -39,13 +40,17 @@ function detailOf(body: unknown): string | null {
   return null;
 }
 
-export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function request<T>(
+  path: string,
+  init: RequestInit = {},
+  base: string = API_BASE,
+): Promise<T> {
   const headers = new Headers(init.headers);
   headers.set("accept", "application/json");
   if (init.body) headers.set("content-type", "application/json");
   let response: Response;
   try {
-    response = await fetch(`${API_BASE}${path}`, { ...init, headers, cache: "no-store" });
+    response = await fetch(`${base}${path}`, { ...init, headers, cache: "no-store" });
   } catch {
     throw new ApiError(0, "The dashboard server did not respond. Check that it is running.");
   }
@@ -75,7 +80,8 @@ export interface StartInvestigation {
 
 export interface DecisionBody {
   decision: "approve" | "reject";
-  reviewer: string;
+  /** Only used when the API has no keys; otherwise the key names the reviewer. */
+  reviewer?: string;
   comment?: string | null;
 }
 
@@ -89,6 +95,10 @@ const id = (value: string) => encodeURIComponent(value);
 
 export const api = {
   config: () => request<ServiceConfig>("/config"),
+  me: () => request<Me>("/me"),
+  signIn: (key: string) =>
+    request<Me>("/session", { method: "POST", body: JSON.stringify({ key }) }, ""),
+  signOut: () => fetch("/session", { method: "DELETE" }).then(() => undefined),
   investigations: () => request<{ investigations: InvestigationSummary[] }>("/investigations"),
   investigation: (investigationId: string) =>
     request<InvestigationDetail>(`/investigations/${id(investigationId)}`),

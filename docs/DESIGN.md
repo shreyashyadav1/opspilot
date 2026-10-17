@@ -304,8 +304,9 @@ The API runs the same graph as the CLI and the benchmark, for people instead of 
 | `POST /investigations` | Alert title, optional service, details and firing time; optional model. Starts a background run and returns `201` |
 | `GET /investigations`, `GET /investigations/{id}` | Status, trace, diagnosis, proposed action, approval request and decision |
 | `GET /investigations/{id}/events` | The same record as Server-Sent Events: a `snapshot` on every change, then `end` |
-| `POST /investigations/{id}/decision` | `{"decision": "approve" \| "reject", "reviewer", "comment"}` |
-| `GET /config` | Model in use (and whether it can run), models on offer, telemetry backend |
+| `POST /investigations/{id}/decision` | `{"decision": "approve" \| "reject", "comment"}`, plus `"reviewer"` when the API runs without keys |
+| `GET /config` | Model in use (and whether it can run), models on offer, telemetry backend, whether keys are required |
+| `GET /me` | The caller: key name, role, and whether it was authenticated |
 | `GET /demo/catalog`, `/demo/faults`, `POST /demo/faults`, `/demo/reset` | Proxy to the chaos API, enabled by `OPSPILOT_CHAOS_URL` |
 | `GET /benchmarks`, `/benchmarks/{run}` | Benchmark runs found in `evals/results` |
 
@@ -326,11 +327,21 @@ The API runs the same graph as the CLI and the benchmark, for people instead of 
   interrupt stays pending (and a decision that never reached the graph is withdrawn), a
   finished graph is settled, and anything cut off mid-run is marked failed. Nothing is
   retried, so nothing runs twice.
+- **Access control.** `OPSPILOT_API_KEYS` lists `name:role:sha256` entries. With keys set,
+  every route but `/health` needs a bearer key: viewer to read, operator to start
+  investigations and demo faults, approver to decide. Keys are kept only as digests and
+  compared in constant time, and a malformed entry stops startup rather than being skipped. The
+  reviewer of a decision is the key's name (a different `reviewer` in the body is refused), and
+  the record, the `decision` trace event and the `approval_wait` span carry
+  `authenticated: true`. Without keys the API is open and decisions say `authenticated: false`.
 - **Boundary.** The demo endpoints belong to the harness side. The MCP server still never sees
   the chaos API, and `OPSPILOT_CHAOS_URL` is not passed to it.
 
 The dashboard is a Next.js App Router app. The browser only talks to its own origin: a route
-handler proxies `/api/*` to `OPSPILOT_API_URL` and passes event streams through. Pages: the
+handler proxies `/api/*` to `OPSPILOT_API_URL` and passes event streams through. When the API
+requires keys, `POST /session` checks the pasted key against `/me` and stores it in an httpOnly,
+SameSite=Strict cookie; the proxy sends it upstream as a bearer header (EventSource cannot set
+headers, so this also covers the live stream) and never forwards other cookies. Pages: the
 incident list (pending decisions first) with the start form and the demo fault panel; the
 investigation page, with a live timeline in which the approval gate is drawn across the steps,
 the diagnosis, and the decision panel; and the benchmark browser, which lists only runs that
@@ -460,9 +471,11 @@ Rules and caveats:
 - API keys are read from `.env` (gitignored). Only `.env.example` is committed.
 - Admin and chaos endpoints exist only on the internal Docker network plus localhost port
   mappings for development; they are not part of the agent's tool surface.
-- The agent API and the dashboard have no authentication yet, and the reviewer name on a
-  decision is self-declared. They are for local use; authentication and roles come before any
-  shared deployment.
+- The agent API can require API keys with viewer, operator and approver roles; with keys on,
+  only approvers can decide, and the reviewer is the key's name rather than a typed one. The
+  default stays open for the local demo, and decisions made that way are recorded as
+  unauthenticated. Keys are static and shared out of band; single sign-on and key rotation
+  without a restart are left for a shared deployment.
 - In docker compose, the agent API mounts the Docker socket so that the MCP server can read
   container logs. That grants control of the Docker daemon, which is acceptable for a local
   demo only; a cluster deployment reads logs from a log backend instead (M7).

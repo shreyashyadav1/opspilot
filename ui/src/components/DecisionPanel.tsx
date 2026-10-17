@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { ApiError, api } from "@/lib/api";
 import { rollbackPlan, type RollbackPlan } from "@/lib/change";
 import { actionLabel, clockTime, percent } from "@/lib/format";
-import { useStoredValue } from "@/lib/hooks";
+import { useMe, useStoredValue } from "@/lib/hooks";
 import { callNumbers, gateState, type GateState } from "@/lib/timeline";
 import type { InvestigationDetail } from "@/lib/types";
 
@@ -58,6 +58,10 @@ export function DecisionPanel({
 }) {
   const ids = useId();
   const [reviewer, setReviewer] = useStoredValue("opspilot.reviewer", "operator");
+  // With API keys on, the key names the reviewer and only approvers may decide.
+  const { data: me } = useMe();
+  const signedIn = me?.authenticated === true;
+  const mayDecide = !signedIn || me.role === "approver";
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState<"approve" | "reject" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -94,7 +98,7 @@ export function DecisionPanel({
     try {
       const updated = await api.decide(investigation.id, {
         decision,
-        reviewer: reviewer.trim() || "operator",
+        ...(signedIn ? {} : { reviewer: reviewer.trim() || "operator" }),
         comment: comment.trim() || null,
       });
       onDecided(updated);
@@ -110,7 +114,7 @@ export function DecisionPanel({
   }
 
   const approval = investigation.approval;
-  const anonymous = (reviewer.trim() || "operator") === "operator";
+  const anonymous = !signedIn && (reviewer.trim() || "operator") === "operator";
   const actionEvent = [...investigation.trace].reverse().find((event) => event.kind === "action");
 
   return (
@@ -159,22 +163,31 @@ export function DecisionPanel({
       {state === "pending" ? (
         <>
           <div className={styles.fields}>
-            <div className={uiStyles.field}>
-              <label htmlFor={`${ids}-reviewer`} className={uiStyles.label}>
-                Your name
-              </label>
-              <input
-                id={`${ids}-reviewer`}
-                name="reviewer"
-                className={uiStyles.input}
-                value={reviewer}
-                maxLength={64}
-                autoComplete="name"
-                spellCheck={false}
-                onChange={(event) => setReviewer(event.target.value)}
-                aria-describedby={anonymous ? `${ids}-reviewer-hint` : undefined}
-              />
-            </div>
+            {signedIn ? (
+              <div className={uiStyles.field}>
+                <span className={uiStyles.label}>Reviewer</span>
+                <p className={styles.signedAs}>
+                  {me.name} <span className={styles.optional}>({me.role}, from your API key)</span>
+                </p>
+              </div>
+            ) : (
+              <div className={uiStyles.field}>
+                <label htmlFor={`${ids}-reviewer`} className={uiStyles.label}>
+                  Your name
+                </label>
+                <input
+                  id={`${ids}-reviewer`}
+                  name="reviewer"
+                  className={uiStyles.input}
+                  value={reviewer}
+                  maxLength={64}
+                  autoComplete="name"
+                  spellCheck={false}
+                  onChange={(event) => setReviewer(event.target.value)}
+                  aria-describedby={anonymous ? `${ids}-reviewer-hint` : undefined}
+                />
+              </div>
+            )}
             <div className={uiStyles.field}>
               <label htmlFor={`${ids}-comment`} className={uiStyles.label}>
                 Note <span className={styles.optional}>(optional)</span>
@@ -195,6 +208,11 @@ export function DecisionPanel({
                 Recorded as “operator” unless you add your name.
               </p>
             ) : null}
+            {!mayDecide ? (
+              <p id={`${ids}-role-hint`} className={`${uiStyles.hint} ${styles.wide}`}>
+                Your key has the {me?.role} role. Approving or rejecting needs an approver key.
+              </p>
+            ) : null}
           </div>
           {error ? (
             <Notice tone="danger" role="alert">
@@ -206,7 +224,7 @@ export function DecisionPanel({
               variant="primary"
               size="large"
               onClick={() => void decide("approve")}
-              disabled={submitting !== null}
+              disabled={submitting !== null || !mayDecide}
               aria-describedby={`${ids}-title ${ids}-approve-effect`}
             >
               {submitting === "approve" ? "Approving…" : `Approve ${noun}`}
@@ -220,7 +238,7 @@ export function DecisionPanel({
               variant="secondary"
               size="large"
               onClick={() => void decide("reject")}
-              disabled={submitting !== null}
+              disabled={submitting !== null || !mayDecide}
               aria-describedby={`${ids}-reject-effect`}
             >
               {submitting === "reject" ? "Rejecting…" : "Reject"}

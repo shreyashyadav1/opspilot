@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { AccessKey } from "./AccessKey";
 import { GateMark } from "./GateMark";
 import { ModelIndicator } from "./ModelIndicator";
 import styles from "./AppHeader.module.css";
@@ -48,6 +49,7 @@ export function AppHeader() {
           </ul>
         </nav>
         <ModelIndicator />
+        <AccessKey />
       </div>
     </header>
   );

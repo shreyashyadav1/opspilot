@@ -1,15 +1,14 @@
 // Proxies /api/* to the agent API, so the browser only ever talks to this origin: no CORS, and
 // the upstream address is a runtime setting (OPSPILOT_API_URL) rather than a build-time one.
-// Server-Sent Events pass through as a stream.
+// Server-Sent Events pass through as a stream. A key saved with POST /session (an httpOnly
+// cookie) is sent upstream as a bearer header; cookies themselves are never forwarded.
+
+import { keyFrom, upstreamBase } from "@/lib/upstream";
 
 export const dynamic = "force-dynamic";
 
 const FORWARDED_REQUEST_HEADERS = ["accept", "content-type", "last-event-id"];
 const FORWARDED_RESPONSE_HEADERS = ["content-type", "cache-control", "retry-after"];
-
-function upstreamBase(): string {
-  return (process.env.OPSPILOT_API_URL ?? "http://127.0.0.1:8180").replace(/\/+$/, "");
-}
 
 async function proxy(
   request: Request,
@@ -28,6 +27,8 @@ async function proxy(
     const value = request.headers.get(name);
     if (value) headers.set(name, value);
   }
+  const key = keyFrom(request);
+  if (key) headers.set("authorization", `Bearer ${key}`);
   const hasBody = request.method !== "GET" && request.method !== "HEAD";
 
   let upstream: Response;

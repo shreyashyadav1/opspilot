@@ -125,6 +125,32 @@ make ui-dev      # dashboard on :8100, proxies /api to :8180
 make api-test ui-test ui-e2e   # pytest; lint, types, Vitest; Playwright smoke tests (Chrome)
 ```
 
+### Access control
+
+Off by default, so the local demo needs no setup. To turn it on, create a key per person and
+give the API the printed entries (it stores only their SHA-256 digests):
+
+```bash
+.venv/bin/python -m opspilot_api.keys new alice approver
+```
+
+```bash
+# .env: comma-separated name:role:sha256 entries
+OPSPILOT_API_KEYS=alice:approver:<digest>,olly:operator:<digest>
+```
+
+| Role | Can |
+| --- | --- |
+| `viewer` | read incidents, traces, benchmark runs and the demo fault list |
+| `operator` | also start investigations and inject or clear demo faults |
+| `approver` | also approve or reject the actions the agent proposes |
+
+Clients send `Authorization: Bearer <key>`; `/health` stays open. In the dashboard, paste the
+key into the field in the header. The dashboard checks it against the API, keeps it in an
+httpOnly cookie and sends it on as a bearer header, so it also covers the live event stream.
+The decision panel then names the reviewer from the key and disables Approve and Reject for
+keys without the approver role.
+
 ## Tracing
 
 Every investigation is one OpenTelemetry trace: a span per graph node, per model call (model,
@@ -213,8 +239,11 @@ the model, date, commit and number of repetitions.
   until a human (or an explicit eval policy) answers.
 - In the agent API, a rejection resumes the paused graph without any tools attached, and a
   decision is accepted once: concurrent or repeated decisions are refused.
-- The agent API and dashboard have no authentication yet; run them locally. In Docker the API
-  mounts the Docker socket to read container logs, which is fine for a local demo only.
+- The agent API can require API keys with roles (`OPSPILOT_API_KEYS`, see
+  [Access control](#access-control)): only an approver key can approve or reject an action,
+  and the reviewer on the record is the key's name. Without keys it runs open for the local
+  demo and marks every decision as unauthenticated. In Docker the API mounts the Docker socket
+  to read container logs, which is fine for a local demo only.
 - The model never writes PromQL, shell commands or URLs; every tool argument is an enum or a
   bounded value, and tool output is truncated before it reaches the model.
 - API keys come from `.env` and are not passed to the MCP server process.

@@ -95,6 +95,8 @@ export interface Approval {
   reviewer: string;
   comment: string | null;
   decided_at: string;
+  /** False when the API ran without keys, so the reviewer name was not verified. */
+  authenticated?: boolean;
 }
 
 export interface ActionResult {
@@ -179,6 +181,16 @@ export interface ServiceConfig {
   model_error: string | null;
   demo_enabled: boolean;
   services: string[];
+  auth_required?: boolean;
+}
+
+export type Role = "viewer" | "operator" | "approver";
+
+/** GET /me: who the saved API key belongs to. Without keys the API is open to everyone. */
+export interface Me {
+  name: string | null;
+  role: Role;
+  authenticated: boolean;
 }
 
 export interface ParamSchema {

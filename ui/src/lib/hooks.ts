@@ -10,6 +10,11 @@ export function useConfig() {
   return useSWR("config", api.config, { revalidateOnFocus: false, shouldRetryOnError: false });
 }
 
+/** The caller behind the saved API key. A 401 error means the API wants a key. */
+export function useMe() {
+  return useSWR("me", api.me, { revalidateOnFocus: false, shouldRetryOnError: false });
+}
+
 export function useInvestigations() {
   return useSWR("investigations", api.investigations, { refreshInterval: 2500 });
 }
