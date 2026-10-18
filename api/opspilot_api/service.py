@@ -8,8 +8,11 @@ Lifecycle: queued -> running -> (awaiting_approval -> executing) -> a terminal s
 - Approving resumes the checkpoint with a fresh tool session, so the write tool can run.
 - Rejecting resumes it on a graph that has no tools at all: whatever the graph did next, there
   is nothing it could execute.
-- On startup, unfinished records are reconciled with their checkpoints. Runs that were cut off
-  are marked failed instead of being retried; nothing is executed twice.
+- On startup, unfinished records are reconciled with their checkpoints. A run cut off before
+  the approval gate is picked up again from its last checkpoint (at most
+  `ApiSettings.max_resumes` times): every step before the gate is read-only, so repeating the
+  step that was interrupted changes nothing. A run cut off while applying an approved action is
+  marked failed instead; nothing that writes is executed twice.
 """
 
 from __future__ import annotations
@@ -242,6 +245,12 @@ class InvestigationService:
     async def recover(self) -> None:
         """Reconcile unfinished records with their checkpoints after a restart."""
         for record in await self.store.unfinished():
+            if record.status in ("queued", "running") and record.approval is None:
+                snapshot = await self._toolless.aget_state(self._thread(record.id))
+                finished = not snapshot.next and bool(snapshot.values.get("outcome"))
+                if not snapshot.interrupts and not finished:
+                    await self._pick_up(record, from_checkpoint=bool(snapshot.next))
+                    continue
             if record.status == "executing":
                 cause = (
                     "The API restarted while the approved action was being applied. Check the "
@@ -250,6 +259,43 @@ class InvestigationService:
             else:
                 cause = "The API restarted before this investigation finished."
             await self._settle(record.id, cause, restarted=True)
+
+    async def _pick_up(self, record: InvestigationRecord, *, from_checkpoint: bool) -> None:
+        """Continue a run that a restart cut off before it reached the approval gate.
+
+        Only read-only steps can have run (the tools node refuses write tools; writes happen
+        only after an approval), so the interrupted step is simply run again. The budget of
+        resumes keeps a run that brings the API down from doing so on every start.
+        """
+        cause = "The API restarted before this investigation finished."
+        if record.resumes >= self.settings.max_resumes:
+            if record.resumes:
+                cause = (
+                    f"The API restarted again before this investigation finished. It was "
+                    f"already resumed {record.resumes} time(s), so it was not picked up again."
+                )
+            await self._settle(record.id, cause, restarted=True)
+            return
+        try:
+            model = self._model_factory(record.model)
+        except ModelSpecError as exc:
+            await self._settle(record.id, f"{cause} It could not be resumed: {exc}", restarted=True)
+            return
+        record.resumes += 1
+        await self._save(record)
+        if from_checkpoint:
+            message = "The API restarted mid-run. Resumed from the last completed step."
+        elif record.status == "queued":
+            message = "The API restarted before this investigation started. Started it now."
+        else:
+            # No checkpoint is written until the first step completes.
+            message = "The API restarted during the first step. Started again from the alert."
+        await self._event(record.id, "note", {"message": message})
+        log.info("Resuming %s after a restart (%s)", record.id, message)
+        self._spawn(
+            self._investigate(record.id, model, resume=from_checkpoint),
+            name=f"investigate-{record.id}",
+        )
 
     async def close(self) -> None:
         tasks = list(self._tasks)
@@ -264,34 +310,50 @@ class InvestigationService:
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
 
-    async def _investigate(self, investigation_id: str, model: BaseChatModel) -> None:
+    async def _investigate(
+        self, investigation_id: str, model: BaseChatModel, *, resume: bool = False
+    ) -> None:
+        """Run the graph up to the approval gate or the end: from the alert, or (`resume`)
+        from the thread's last checkpoint after a restart, inside the original trace."""
         async with self._slots:
             record = await self.get(investigation_id)
-            record.status, record.started_at = "running", utcnow()
+            record.status = "running"
+            record.started_at = record.started_at or utcnow()
             alert = record.alert
-            text = alert_message(
-                alert.title, alert.service, alert.details, started_minutes_ago=alert.firing_minutes
-            )
+            payload: Any = None
+            if not resume:
+                text = alert_message(
+                    alert.title,
+                    alert.service,
+                    alert.details,
+                    started_minutes_ago=alert.firing_minutes,
+                )
+                payload = {"messages": [HumanMessage(text)]}
+            attributes = {
+                "opspilot.investigation_id": investigation_id,
+                "opspilot.alert.title": alert.title,
+                "opspilot.model": record.model,
+                "opspilot.resumes": record.resumes,
+            }
             error = None
-            with self._tracer.start_as_current_span(
-                "investigation",
-                attributes={
-                    "opspilot.investigation_id": investigation_id,
-                    "opspilot.alert.title": alert.title,
-                    "opspilot.model": record.model,
-                },
-            ):
+            joined = resume and record.trace_parent is not None
+            if joined:
+                span = self._tracer.start_as_current_span(
+                    "investigation.recover",
+                    context=context_from_traceparent(record.trace_parent),
+                    attributes=attributes,
+                )
+            else:
+                span = self._tracer.start_as_current_span("investigation", attributes=attributes)
+            with span:
                 # Persisted before the (possibly long) stream runs, so a crash mid-run still
                 # leaves enough to record the approval wait in the right trace later.
-                record.trace_parent = traceparent_of()
+                if not joined:
+                    record.trace_parent = traceparent_of()
                 await self._save(record)
                 try:
                     async with self._toolset_factory() as tools:
-                        await self._stream(
-                            investigation_id,
-                            self._graph(model, tools),
-                            {"messages": [HumanMessage(text)]},
-                        )
+                        await self._stream(investigation_id, self._graph(model, tools), payload)
                 except asyncio.CancelledError:
                     raise
                 except Exception as exc:  # the run fails, the API keeps serving
@@ -329,8 +391,10 @@ class InvestigationService:
         await self._settle(investigation_id, error)
 
     async def _stream(self, investigation_id: str, graph: Any, payload: Any) -> None:
+        # "sync" durability: each step's checkpoint is on disk before the next step starts, so
+        # a restart resumes from the step that was running rather than an older one.
         async for update in graph.astream(
-            payload, self._thread(investigation_id), stream_mode="updates"
+            payload, self._thread(investigation_id), stream_mode="updates", durability="sync"
         ):
             for node, values in update.items():
                 if node != "__interrupt__":

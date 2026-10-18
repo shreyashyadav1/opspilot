@@ -132,6 +132,9 @@ class InvestigationRecord(BaseModel):
     # The investigation's root span, as a W3C traceparent string: lets a decision made minutes
     # or an API restart later still record its "approval_wait" span in the same trace.
     trace_parent: str | None = None
+    # How many times a run cut off by an API restart was picked up again (see
+    # InvestigationService.recover). Bounded by ApiSettings.max_resumes.
+    resumes: int = 0
 
 
 ApprovalState = Literal["not_required", "pending", "approved", "rejected"]

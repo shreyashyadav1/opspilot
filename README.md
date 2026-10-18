@@ -115,6 +115,9 @@ Without an API key the agent API uses the rule-based playbook (`fake:playbook`),
 dashboard labels as a baseline, not an LLM. With `GROQ_API_KEY` in `.env`, it uses
 `openai/gpt-oss-120b` and still offers the playbook for comparison. Investigations and
 pending approvals survive restarts of the API; `make down` removes them with the other volumes.
+A run cut off by a restart before the approval gate resumes from its last checkpoint (those
+steps are read-only); one cut off while applying an approved action is marked failed, never
+retried.
 
 For development, run the API and the dashboard on the host against `make up`:
 

@@ -13,6 +13,9 @@
 - OPSPILOT_PRICING_FILE: USD-per-million-token price table used to cost each investigation
   (default `evals/pricing.yaml`, the same file the benchmark prices its runs from). A model
   missing from it is reported with unknown cost rather than a guessed one.
+- OPSPILOT_MAX_RESUMES (default 1): how many times an investigation cut off by an API restart
+  before reaching the approval gate is picked up again from its last checkpoint. 0 marks such
+  runs failed instead.
 """
 
 from __future__ import annotations
@@ -49,6 +52,7 @@ class ApiSettings:
     pricing_file: Path = field(default_factory=lambda: REPO_ROOT / "evals" / "pricing.yaml")
     max_concurrent: int = 2
     max_turns: int = 12
+    max_resumes: int = 1
 
     @property
     def records_db(self) -> Path:
@@ -81,4 +85,5 @@ class ApiSettings:
             pricing_file=Path(pricing) if pricing else defaults.pricing_file,
             max_concurrent=int(os.getenv("OPSPILOT_MAX_CONCURRENT", str(defaults.max_concurrent))),
             max_turns=int(os.getenv("OPSPILOT_MAX_TURNS", str(defaults.max_turns))),
+            max_resumes=int(os.getenv("OPSPILOT_MAX_RESUMES", str(defaults.max_resumes))),
         )

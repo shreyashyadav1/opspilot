@@ -15,7 +15,9 @@ from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from tests.api.support import TERMINAL, FakeTools, build_app, serve, wait_for
+from opspilot_agent.llm.fake import ScriptedChatModel
+from opspilot_api.app import create_app
+from tests.api.support import TERMINAL, BlockingTools, FakeTools, build_app, script, serve, wait_for
 
 ALERT = {"alert": "Checkout error rate above SLO", "target": "storefront", "firing_minutes": 4}
 
@@ -131,3 +133,41 @@ async def test_a_decision_after_a_restart_joins_the_original_trace(settings, too
     # The original root span belongs to the first process; the resumed spans point back at it.
     root = _named(before_spans.get_finished_spans(), "investigation")
     assert _named(resumed, "investigation.resume").parent.span_id == root.context.span_id
+
+
+async def test_a_run_resumed_after_a_restart_joins_the_original_trace(settings):
+    before, before_spans = _provider()
+    first = create_app(
+        settings,
+        model_factory=lambda spec: ScriptedChatModel(responses=script("escalate")),
+        toolset_factory=BlockingTools().session,
+        tracer_provider=before,
+    )
+    async with serve(first) as c:
+        investigation_id = (await c.post("/investigations", json=ALERT)).json()["id"]
+        async with asyncio.timeout(5):
+            while True:
+                trace = (await c.get(f"/investigations/{investigation_id}")).json()["trace"]
+                if any(e["kind"] == "model_turn" for e in trace):
+                    break
+                await asyncio.sleep(0.02)
+        trace_id = (await c.get(f"/investigations/{investigation_id}")).json()["trace_id"]
+
+    after, after_spans = _provider()
+    second = create_app(
+        settings,
+        model_factory=lambda spec: ScriptedChatModel(responses=script("escalate")[1:]),
+        toolset_factory=FakeTools().session,
+        tracer_provider=after,
+    )
+    async with serve(second) as c:
+        done = await wait_for(c, investigation_id, TERMINAL)
+    assert done["status"] == "advisory"
+    assert done["trace_id"] == trace_id
+
+    # The cut-off run's root span ends on shutdown; the resumed run hangs below it.
+    spans = after_spans.get_finished_spans()
+    _assert_one_connected_trace(before_spans.get_finished_spans() + spans, trace_id)
+    recovered = _named(spans, "investigation.recover")
+    assert recovered.attributes["opspilot.resumes"] == 1
+    assert "investigation" not in [s.name for s in spans]

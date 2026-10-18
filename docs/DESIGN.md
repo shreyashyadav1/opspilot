@@ -323,9 +323,18 @@ The API runs the same graph as the CLI and the benchmark, for people instead of 
   resolve to exactly one. Approving resumes the checkpoint with a fresh tool session. Rejecting
   resumes it on a graph built without any tools, so there is nothing it could execute.
 - **Restarts.** On startup, unfinished records are reconciled with their checkpoints: a pending
-  interrupt stays pending (and a decision that never reached the graph is withdrawn), a
-  finished graph is settled, and anything cut off mid-run is marked failed. Nothing is
-  retried, so nothing runs twice.
+  interrupt stays pending (and a decision that never reached the graph is withdrawn), and a
+  finished graph is settled. A run cut off before the approval gate is picked up again from
+  its last checkpoint, inside its original trace (an `investigation.recover` span), with a note
+  on its timeline; a queued run, or one cut off in its first step (no checkpoint exists until a
+  step completes), starts again from the alert. This is safe because every step before the gate
+  is read-only: the tools node refuses write tools, so repeating the interrupted step changes
+  nothing. Checkpoints are written with `durability="sync"`, so each step's checkpoint is on
+  disk before the next step starts. `OPSPILOT_MAX_RESUMES` (default 1) bounds how often one run
+  is picked up, so a run that brings the API down cannot do so on every start; past it, or when
+  the run's model can no longer be built, the run is marked failed with the reason. A run cut
+  off while applying an approved action is never retried: it is marked failed and the operator
+  is told to check the deploy history, so nothing that writes runs twice.
 - **Boundary.** The demo endpoints belong to the harness side. The MCP server still never sees
   the chaos API, and `OPSPILOT_CHAOS_URL` is not passed to it.
 
