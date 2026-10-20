@@ -90,7 +90,10 @@ make down
 When the agent proposes a rollback, the CLI shows the action with its evidence and waits for a
 yes or no. Use `--approve no` to only diagnose. Any OpenAI-compatible model works through
 `--model provider:model` (`groq`, `openai`, `openrouter`, `ollama`, or `custom` with
-`OPSPILOT_LLM_BASE_URL`).
+`OPSPILOT_LLM_BASE_URL`). `switchyard:gpt-oss-120b` sends model calls through the
+[Switchyard](https://github.com/shreyashyadav1/switchyard) gateway (`SWITCHYARD_URL`,
+`SWITCHYARD_API_KEY`), which adds retries, provider fallback, rate limits and a daily budget; the
+run's trace context goes with each call, so the gateway's spans join the investigation's trace.
 
 ## Dashboard
 
