@@ -17,6 +17,7 @@ import type { InvestigationDetail, Status, TraceEvent } from "@/lib/types";
 
 import { GateMark } from "./GateMark";
 import { JsonBlock } from "./JsonBlock";
+import { ReviewerName, UNVERIFIED } from "./ReviewerName";
 import { Signature } from "./Signature";
 import styles from "./Timeline.module.css";
 
@@ -178,8 +179,11 @@ function Gate({
           {decision ? (
             <p className={styles.meta}>
               {decision.data.decision === "approve" ? "Approved" : "Rejected"} by{" "}
-              {decision.data.reviewer} at{" "}
-              <time dateTime={decision.at}>{clockTime(decision.at)}</time>
+              <ReviewerName
+                name={decision.data.reviewer}
+                authenticated={decision.data.authenticated}
+              />{" "}
+              at <time dateTime={decision.at}>{clockTime(decision.at)}</time>
               {decision.data.comment ? `: “${decision.data.comment}”` : "."}
             </p>
           ) : state === "pending" ? (
@@ -243,6 +247,7 @@ function EventEntry({
       break;
     case "decision":
       title = `${event.data.decision === "approve" ? "Approved" : "Rejected"} by ${event.data.reviewer}`;
+      if (event.data.authenticated !== true) title += ` (${UNVERIFIED})`;
       break;
     case "action":
       title = event.data.ok ? "Action executed" : "Action failed";

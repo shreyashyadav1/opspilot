@@ -259,3 +259,8 @@ textarea.input {
     transform: rotate(360deg);
   }
 }
+
+.unverified {
+  color: var(--ink-3);
+  white-space: nowrap;
+}

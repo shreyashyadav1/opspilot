@@ -60,4 +60,22 @@ describe("Timeline", () => {
     expect(screen.getByText("Action executed")).toBeInTheDocument();
     expect(screen.getByText("orders rolled back from 1.8.4 to 1.8.3.")).toBeInTheDocument();
   });
+  it("marks decisions recorded without a verified reviewer", () => {
+    const { rerender } = render(<Timeline investigation={rejected()} />);
+    expect(screen.getByRole("listitem", { name: "Approval gate" })).toHaveTextContent(
+      "Rejected by bob (name not verified) at",
+    );
+
+    const signed = executed();
+    signed.trace = signed.trace.map((event) =>
+      event.kind === "decision"
+        ? { ...event, data: { ...event.data, authenticated: true } }
+        : event,
+    );
+    rerender(<Timeline investigation={signed} />);
+    expect(screen.getByRole("listitem", { name: "Approval gate" })).toHaveTextContent(
+      "Approved by alice at",
+    );
+    expect(screen.queryByText(/name not verified/)).not.toBeInTheDocument();
+  });
 });

@@ -152,7 +152,13 @@ export type TraceEvent =
   | EventOf<"approval_requested", ApprovalRequest>
   | EventOf<
       "decision",
-      { decision: "approve" | "reject"; reviewer: string; comment: string | null }
+      {
+        decision: "approve" | "reject";
+        reviewer: string;
+        comment: string | null;
+        /** Absent on events recorded before API keys existed, which were all unauthenticated. */
+        authenticated?: boolean;
+      }
     >
   | EventOf<"action", ActionResult>
   | EventOf<"finished", { outcome: string }>
