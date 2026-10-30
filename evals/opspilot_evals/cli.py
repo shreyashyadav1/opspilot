@@ -54,6 +54,8 @@ async def _main(args: argparse.Namespace) -> int:
                 pricing,
                 repeats=args.repeats,
                 config=AgentConfig(max_turns=args.max_turns),
+                start_retries=args.start_retries,
+                retry_delay_s=args.retry_delay_seconds,
             )
         finally:
             if isinstance(environment, LiveEnvironment):
@@ -86,6 +88,13 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--max-turns", type=int, default=12)
     parser.add_argument("--warmup-seconds", type=int, default=None, help="override (live env)")
     parser.add_argument("--cooldown-seconds", type=int, default=120, help="after reset (live)")
+    parser.add_argument(
+        "--start-retries",
+        type=int,
+        default=1,
+        help="re-run a scenario that failed before the agent's first step (recorded in results)",
+    )
+    parser.add_argument("--retry-delay-seconds", type=float, default=30.0)
     parser.add_argument("--pricing", type=Path, default=EVALS_DIR / "pricing.yaml")
     parser.add_argument("--results", type=Path, default=EVALS_DIR / "results")
     parser.add_argument("--out-dir", type=Path, default=None)

@@ -201,6 +201,14 @@ make eval MODEL=groq:openai/gpt-oss-120b   # needs GROQ_API_KEY in .env
 .venv/bin/opspilot-eval --env live --model groq:openai/gpt-oss-120b --repeats 3
 ```
 
+A scenario that fails before the agent's first step (the tool server didn't start, or the first
+model call was refused, for example by a rate limit) is run once more after 30 seconds; at that
+point no tool has been called, so the fault is still in place and the rerun starts from scratch.
+The report counts these reruns and `results.json` keeps each earlier error under
+`retried_errors`. Change this with `--start-retries` (0 turns it off) and
+`--retry-delay-seconds`. A failure after the first step is never retried. Errors are recorded by
+their underlying cause rather than as the task group that wrapped them.
+
 ## Results
 
 Results will be added after the first real benchmark run against a hosted model, together with
