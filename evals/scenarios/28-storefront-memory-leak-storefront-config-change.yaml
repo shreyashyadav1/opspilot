@@ -1,0 +1,25 @@
+id: storefront-memory-leak-storefront-config-change
+title: Storefront memory leak shortly after a storefront config change
+description: >
+  Storefront shipped a harmless change to its per-order item limit six minutes ago. Two minutes
+  later every request started retaining memory, and once the budget was used up all storefront
+  requests failed with MemoryError. The deploy is the obvious suspect, but rolling it back would
+  not release the memory; restarting storefront would.
+alert:
+  title: Checkout error rate above SLO
+  service: storefront
+  details: Storefront 5xx rate is far above the 2% SLO on every route.
+fault:
+  type: memory_leak
+  target: storefront
+  params: {kb_per_request: 256, limit_mb: 64}
+distractors:
+  - {type: config_deploy, service: storefront, minutes_ago: 6}
+expected:
+  root_cause_service: storefront
+  category: resource_exhaustion
+  action: {type: restart_service, target_service: storefront}
+relevant_services: [storefront]
+required_evidence:
+  - {tool: search_logs, service: storefront}
+  - {tool: get_recent_deploys}
