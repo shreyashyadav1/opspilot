@@ -50,7 +50,7 @@ flowchart LR
 | Demo system | [`demo-system/`](demo-system) | storefront and payments (FastAPI), orders (Spring Boot 3.5, Java 21, HikariCP, Postgres), JSON logs with trace ids, Prometheus metrics with identical names across languages, five injectable fault types |
 | MCP server | [`mcp-servers/`](mcp-servers/opspilot_mcp) | Official Python `mcp` SDK. `get_service_health`, `query_metric`, `search_logs`, `get_recent_deploys` (read-only) and `rollback_deploy` (destructive). Live and simulated backends |
 | Agent | [`agent/`](agent/opspilot_agent) | LangGraph graph with a bounded investigation loop, a Pydantic-validated `Diagnosis`, and an `interrupt()`-based approval gate |
-| Benchmark | [`evals/`](evals) | 26 YAML scenarios, runner, scorer, JSON and Markdown reports |
+| Benchmark | [`evals/`](evals) | 28 YAML scenarios, runner, scorer, JSON and Markdown reports |
 | Agent API | [`api/`](api/opspilot_api) | FastAPI. Runs investigations in the background, streams them over Server-Sent Events, keeps pending approvals in a LangGraph SQLite checkpoint across restarts |
 | Dashboard | [`ui/`](ui) | Next.js App Router and TypeScript. Incident list, investigation timeline with the approval gate, approve and reject, demo fault injection, benchmark browser |
 
@@ -212,6 +212,7 @@ and the expected root cause and action. For every scenario the runner:
 | `db_pool_exhaustion` | resource_exhaustion | a leaking export job drains the orders connection pool |
 | `bad_config_deploy` | bad_deploy | a deploy ships a broken setting; errors start right after it |
 | `dependency_outage` | dependency_outage | the service stops serving; health checks and scrapes fail |
+| `memory_leak` | resource_exhaustion | storefront or payments retains memory on every request until allocations fail with MemoryError; health checks still pass |
 
 Metrics per run: root-cause accuracy (service and category must both match), action accuracy,
 tool-call precision (successful, non-repeated calls on services relevant to the incident),

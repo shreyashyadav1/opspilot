@@ -206,8 +206,34 @@ def test_catalog_lists_every_fault_type_with_targets_and_param_bounds(monkeypatc
     assert set(catalog) == {t.value for t in FaultType}
     assert catalog["db_pool_exhaustion"]["targets"] == ["orders"]
     assert catalog["dependency_outage"]["targets"] == ["orders", "payments"]
+    assert catalog["memory_leak"]["targets"] == ["payments", "storefront"]
+    assert catalog["memory_leak"]["category"] == "resource_exhaustion"
     assert catalog["bad_config_deploy"]["category"] == "bad_deploy"
     assert catalog["bad_config_deploy"]["params"] == {}
     delay = catalog["latency_spike"]["params"]["delay_ms"]
     assert (delay["minimum"], delay["maximum"], delay["default"]) == (50, 10_000, 1200)
     assert all(entry["description"].endswith(".") for entry in catalog.values())
+
+
+async def test_memory_leak_sets_and_clears_its_failure_fields(plane, admin):
+    record = await plane.inject(
+        FaultRequest(type=FaultType.MEMORY_LEAK, target="storefront", params={"limit_mb": 48})
+    )
+    assert record.ground_truth.category == "resource_exhaustion"
+    assert admin.calls[-1] == (
+        "put_failures",
+        "storefront",
+        {"memory_leak_kb_per_request": 256, "memory_leak_limit_mb": 48},
+    )
+    await plane.clear(record.id)
+    assert admin.calls[-1] == ("put_failures", "storefront", {})
+
+
+@pytest.mark.parametrize(
+    ("target", "params"),
+    [("orders", {}), ("payments", {"kb_per_request": 64}), ("payments", {"limit_mb": 160})],
+)
+async def test_memory_leak_rejects_jvm_targets_and_unsafe_params(plane, target, params):
+    with pytest.raises(ChaosError) as error:
+        await plane.inject(FaultRequest(type=FaultType.MEMORY_LEAK, target=target, params=params))
+    assert error.value.status_code == 422

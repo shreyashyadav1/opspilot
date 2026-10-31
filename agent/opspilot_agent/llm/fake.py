@@ -164,7 +164,7 @@ class _Findings:
     def log_text(self, service: str) -> str:
         logs = self.logs.get(service, {})
         messages = [m["example"] for m in logs.get("top_messages", [])]
-        messages += [r["message"] for r in logs.get("recent", [])]
+        messages += [f"{r['message']} {r.get('error_type', '')}" for r in logs.get("recent", [])]
         return " ".join(messages)
 
     def config_deploys(self, service: str) -> list[dict[str, Any]]:
@@ -205,7 +205,8 @@ def playbook_diagnosis(findings: _Findings) -> dict[str, Any]:
     deploys = findings.config_deploys(suspect)
     down = health.get("detail") == "service_unavailable" or health.get("status") == "unreachable"
 
-    if "connection is not available" in text or (pending or 0) > 0:
+    exhausted = "connection is not available" in text or "memoryerror" in text
+    if exhausted or (pending or 0) > 0:
         category, action = "resource_exhaustion", "restart_service"
     elif down:
         category, action = "dependency_outage", "escalate"

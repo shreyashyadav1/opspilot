@@ -17,6 +17,7 @@ FAULT_CATEGORY: dict[str, FaultCategory] = {
     "db_pool_exhaustion": FaultCategory.RESOURCE_EXHAUSTION,
     "bad_config_deploy": FaultCategory.BAD_DEPLOY,
     "dependency_outage": FaultCategory.DEPENDENCY_OUTAGE,
+    "memory_leak": FaultCategory.RESOURCE_EXHAUSTION,
 }
 
 

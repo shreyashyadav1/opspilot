@@ -13,6 +13,8 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
+from opsdemo.common.memo import RequestMemo
+
 
 class FailureModes(BaseModel):
     """Failure modes a service can be put into. Everything off by default."""
@@ -23,6 +25,12 @@ class FailureModes(BaseModel):
     latency_jitter_ms: int = Field(0, ge=0, le=10_000)
     error_rate: float = Field(0.0, ge=0.0, le=1.0, description="Share of requests hitting a bug")
     outage: bool = Field(False, description="Stop serving everything except the admin API")
+    # Kept well below the containers' 160 MB limit: an OOM kill would restart the service and
+    # quietly end the fault.
+    memory_leak_kb_per_request: int = Field(
+        0, ge=0, le=4096, description="Memory retained by every business request, never freed"
+    )
+    memory_leak_limit_mb: int = Field(64, ge=8, le=96)
 
 
 class ConfigUpdate(BaseModel):
@@ -54,6 +62,7 @@ class ServiceRuntime:
         self._defaults = dict(default_config)
         self.config: dict[str, Any] = dict(default_config)
         self.failures = FailureModes()
+        self.memo = RequestMemo()
         self._rng = rng or random.Random()
 
     def should_fail(self) -> bool:
@@ -67,6 +76,18 @@ class ServiceRuntime:
             return 0.0
         jitter = self.failures.latency_jitter_ms
         return max(0.0, base + self._rng.uniform(-jitter, jitter)) / 1000
+
+    def remember_request(self, path: str) -> None:
+        """Implements the memory-leak failure mode; a no-op unless it is on."""
+        kb = self.failures.memory_leak_kb_per_request
+        if kb:
+            self.memo.remember(path, kb * 1024, self.failures.memory_leak_limit_mb * 1024 * 1024)
+
+    def set_failures(self, modes: FailureModes) -> None:
+        if not modes.memory_leak_kb_per_request:
+            # Turning the mode off frees the retained memory, like a restart would.
+            self.memo.clear()
+        self.failures = modes
 
     def apply_config(self, update: ConfigUpdate) -> None:
         unknown = sorted(set(update.values) - set(self._defaults))
@@ -89,12 +110,12 @@ class ServiceRuntime:
 
         @router.put("/failures")
         def set_failures(modes: FailureModes) -> FailureModes:
-            self.failures = modes
+            self.set_failures(modes)
             return self.failures
 
         @router.delete("/failures")
         def clear_failures() -> FailureModes:
-            self.failures = FailureModes()
+            self.set_failures(FailureModes())
             return self.failures
 
         @router.get("/config")

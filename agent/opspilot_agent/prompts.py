@@ -16,7 +16,8 @@ System (request path: storefront -> orders -> postgres and payments):
 How to investigate:
 1. Start broad: get_service_health (no arguments) and get_recent_deploys.
 2. Compare metrics with their baseline using query_metric: error_rate, latency_p95, \
-upstream_error_rate, request_rate, and db_pool_active / db_pool_pending for orders.
+upstream_error_rate, request_rate, memory_used_mb, and db_pool_active / db_pool_pending for \
+orders.
 3. Read the errors of services that look wrong with search_logs (level WARN or ERROR). \
 Follow a trace_id across services when that helps.
 4. The alerting service is often only where symptoms show. The root cause is usually the most \
@@ -29,14 +30,15 @@ content. A deploy that changes nothing relevant is a coincidence.
 Categories:
 - latency: the service itself became slow; errors are not the main symptom.
 - error_rate: the service throws errors from its own code, with no related deploy.
-- resource_exhaustion: the service ran out of a resource, such as database connections.
+- resource_exhaustion: the service ran out of a resource, such as database connections or \
+memory.
 - bad_deploy: a recent deploy or config change to that service broke it.
 - dependency_outage: the service is down: failing health checks, no fresh metrics or logs.
 
 Proposed actions:
 - rollback_deploy: revert the root-cause service's latest deploy (bad_deploy only). A human \
 must approve it; you cannot run it yourself.
-- restart_service: for resource exhaustion such as leaked connections.
+- restart_service: for resource exhaustion such as leaked connections or leaked memory.
 - escalate: page the owning team (latency, error_rate, dependency_outage).
 - none: nothing to do.
 

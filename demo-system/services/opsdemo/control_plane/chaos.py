@@ -29,6 +29,7 @@ class FaultType(StrEnum):
     DB_POOL_EXHAUSTION = "db_pool_exhaustion"
     BAD_CONFIG_DEPLOY = "bad_config_deploy"
     DEPENDENCY_OUTAGE = "dependency_outage"
+    MEMORY_LEAK = "memory_leak"
 
 
 # Ground-truth category recorded for each fault type. These are the labels the agent's
@@ -39,6 +40,7 @@ CATEGORY: dict[FaultType, str] = {
     FaultType.DB_POOL_EXHAUSTION: "resource_exhaustion",
     FaultType.BAD_CONFIG_DEPLOY: "bad_deploy",
     FaultType.DEPENDENCY_OUTAGE: "dependency_outage",
+    FaultType.MEMORY_LEAK: "resource_exhaustion",
 }
 
 _ALL = frozenset(BASELINES)
@@ -48,6 +50,8 @@ ALLOWED_TARGETS: dict[FaultType, frozenset[str]] = {
     FaultType.DB_POOL_EXHAUSTION: frozenset({"orders"}),
     FaultType.BAD_CONFIG_DEPLOY: _ALL,
     FaultType.DEPENDENCY_OUTAGE: frozenset({"orders", "payments"}),
+    # The Python services only: the JVM's heap is managed by its own limits.
+    FaultType.MEMORY_LEAK: frozenset({"storefront", "payments"}),
 }
 
 
@@ -62,6 +66,13 @@ class ErrorParams(BaseModel):
     error_rate: float = Field(0.4, gt=0.0, le=1.0)
 
 
+class MemoryLeakParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    # At least 128 KB so every buffer is mapped on its own and freed back to the OS on clear.
+    kb_per_request: int = Field(256, ge=128, le=4096)
+    limit_mb: int = Field(64, ge=8, le=96)
+
+
 class NoParams(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -72,6 +83,7 @@ PARAMS: dict[FaultType, type[BaseModel]] = {
     FaultType.DB_POOL_EXHAUSTION: NoParams,
     FaultType.BAD_CONFIG_DEPLOY: NoParams,
     FaultType.DEPENDENCY_OUTAGE: NoParams,
+    FaultType.MEMORY_LEAK: MemoryLeakParams,
 }
 
 
@@ -86,6 +98,10 @@ DESCRIPTIONS: dict[FaultType, str] = {
     ),
     FaultType.DEPENDENCY_OUTAGE: (
         "The target stops serving: 503 on every endpoint, failing health checks and scrapes."
+    ),
+    FaultType.MEMORY_LEAK: (
+        "Every request retains memory that is never freed; once the budget is used up, "
+        "requests fail with MemoryError."
     ),
 }
 
@@ -126,6 +142,12 @@ def failure_fields(fault_type: FaultType, params: BaseModel) -> dict[str, Any]:
             return {"pool_exhaustion": True}
         case FaultType.DEPENDENCY_OUTAGE:
             return {"outage": True}
+        case FaultType.MEMORY_LEAK:
+            assert isinstance(params, MemoryLeakParams)
+            return {
+                "memory_leak_kb_per_request": params.kb_per_request,
+                "memory_leak_limit_mb": params.limit_mb,
+            }
     raise ValueError(f"{fault_type} is not implemented through failure modes")
 
 
