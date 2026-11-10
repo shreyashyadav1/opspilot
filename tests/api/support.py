@@ -105,6 +105,20 @@ class FakeTools:
         return ToolSet.from_tools([read, write])
 
 
+class BlockingTools(FakeTools):
+    """The first health check never returns, so the run is cut off inside the tools node."""
+
+    def _toolset(self):
+        toolset = super()._toolset()
+        health = toolset.read[0]
+
+        async def stuck(**kwargs):
+            await asyncio.Event().wait()
+
+        health.coroutine = stuck
+        return toolset
+
+
 @asynccontextmanager
 async def serve(app: FastAPI) -> AsyncIterator[httpx.AsyncClient]:
     """Run the app's lifespan (startup recovery, shutdown) around an in-process client."""

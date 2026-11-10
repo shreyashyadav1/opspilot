@@ -1,11 +1,21 @@
 """Investigations through the API: background runs, traces, the approval gate, restarts."""
 
 import asyncio
+from dataclasses import replace
 from datetime import datetime
 
+from opspilot_agent.llm import ModelSpecError
 from opspilot_agent.llm.fake import ScriptedChatModel
 from opspilot_api.app import create_app
-from tests.api.support import TERMINAL, FakeTools, build_app, serve, wait_for
+from tests.api.support import (
+    TERMINAL,
+    BlockingTools,
+    FakeTools,
+    build_app,
+    script,
+    serve,
+    wait_for,
+)
 
 ALERT = {"alert": "Checkout error rate above SLO", "target": "storefront", "firing_minutes": 4}
 
@@ -217,7 +227,8 @@ class BlockingModel(ScriptedChatModel):
         await asyncio.Event().wait()
 
 
-async def test_run_cut_off_by_a_restart_is_marked_failed(settings, tools):
+async def test_run_cut_off_by_a_restart_is_marked_failed_when_resuming_is_off(settings, tools):
+    settings = replace(settings, max_resumes=0)
     app = create_app(
         settings,
         model_factory=lambda spec: BlockingModel(responses=[]),
@@ -232,6 +243,150 @@ async def test_run_cut_off_by_a_restart_is_marked_failed(settings, tools):
     assert body["status"] == "failed"
     assert body["error"] == "The API restarted before this investigation finished."
     assert body["trace"][-1]["kind"] == "error"
+
+
+async def wait_for_event(client, investigation_id, kind):
+    """Poll until the investigation's trace has an event of `kind` (at most 5 seconds)."""
+    async with asyncio.timeout(5):
+        while True:
+            body = (await client.get(f"/investigations/{investigation_id}")).json()
+            if any(event["kind"] == kind for event in body["trace"]):
+                return
+            await asyncio.sleep(0.02)
+
+
+def blocking_app(settings, tools):
+    return create_app(
+        settings,
+        model_factory=lambda spec: BlockingModel(responses=[]),
+        toolset_factory=tools.session,
+    )
+
+
+async def test_run_cut_off_in_its_first_step_starts_again_after_a_restart(settings, tools):
+    async with serve(blocking_app(settings, tools)) as client:
+        investigation_id = await start(client)
+        await wait_for(client, investigation_id, {"running"})
+
+    after_restart = FakeTools()
+    async with serve(build_app(settings, after_restart, "escalate")) as client:
+        body = await wait_for(client, investigation_id, TERMINAL)
+    assert body["status"] == "advisory"
+    assert body["error"] is None
+    kinds = [event["kind"] for event in body["trace"]]
+    assert kinds == [
+        "alert",
+        "note",
+        "model_turn",
+        "tool_call",
+        "model_turn",
+        "diagnosis",
+        "finished",
+    ]
+    assert "Started again from the alert" in body["trace"][1]["data"]["message"]
+    assert after_restart.calls == [("get_service_health", {"service": None})]
+
+
+async def test_resume_repeats_only_the_interrupted_step(settings):
+    first = create_app(
+        settings,
+        model_factory=lambda spec: ScriptedChatModel(responses=script("escalate")),
+        toolset_factory=BlockingTools().session,
+    )
+    async with serve(first) as client:
+        investigation_id = await start(client)
+        await wait_for(client, investigation_id, {"running"})
+        await wait_for_event(client, investigation_id, "model_turn")
+
+    # After the restart the model only has the second answer: the first turn is not redone.
+    after_restart = FakeTools()
+    second = create_app(
+        settings,
+        model_factory=lambda spec: ScriptedChatModel(responses=script("escalate")[1:]),
+        toolset_factory=after_restart.session,
+    )
+    async with serve(second) as client:
+        body = await wait_for(client, investigation_id, TERMINAL)
+    assert body["status"] == "advisory"
+    assert body["usage"]["turns"] == 2
+    assert [e["kind"] for e in body["trace"]].count("model_turn") == 2
+    notes = [e["data"]["message"] for e in body["trace"] if e["kind"] == "note"]
+    assert notes == ["The API restarted mid-run. Resumed from the last completed step."]
+    assert after_restart.calls == [("get_service_health", {"service": None})]
+
+
+async def test_a_run_is_resumed_at_most_max_resumes_times(settings, tools):
+    async with serve(blocking_app(settings, tools)) as client:
+        investigation_id = await start(client)
+        await wait_for(client, investigation_id, {"running"})
+    async with serve(blocking_app(settings, tools)) as client:
+        await wait_for(client, investigation_id, {"running"})
+
+    async with serve(build_app(settings, FakeTools(), "escalate")) as client:
+        body = (await client.get(f"/investigations/{investigation_id}")).json()
+    assert body["status"] == "failed"
+    assert "already resumed 1 time(s)" in body["error"]
+
+
+async def test_queued_run_is_started_after_a_restart(settings, tools):
+    settings = replace(settings, max_concurrent=1)
+    async with serve(blocking_app(settings, tools)) as client:
+        running = await start(client)
+        queued = await start(client)
+        await wait_for(client, running, {"running"})
+        assert (await client.get(f"/investigations/{queued}")).json()["status"] == "queued"
+
+    async with serve(build_app(settings, FakeTools(), "escalate")) as client:
+        first = await wait_for(client, running, TERMINAL)
+        second = await wait_for(client, queued, TERMINAL)
+    assert first["status"] == second["status"] == "advisory"
+    assert "Started it now" in second["trace"][1]["data"]["message"]
+
+
+async def test_run_whose_model_is_gone_after_a_restart_fails_with_the_reason(settings, tools):
+    async with serve(blocking_app(settings, tools)) as client:
+        investigation_id = await start(client)
+        await wait_for(client, investigation_id, {"running"})
+
+    def no_model(spec):
+        raise ModelSpecError("GROQ_API_KEY is not set")
+
+    app = create_app(settings, model_factory=no_model, toolset_factory=FakeTools().session)
+    async with serve(app) as client:
+        body = (await client.get(f"/investigations/{investigation_id}")).json()
+    assert body["status"] == "failed"
+    assert body["error"].endswith("It could not be resumed: GROQ_API_KEY is not set")
+
+
+async def test_approved_action_cut_off_by_a_restart_is_not_retried(settings):
+    class StuckRollback(FakeTools):
+        def _toolset(self):
+            toolset = super()._toolset()
+
+            async def stuck(**kwargs):
+                self.calls.append(("rollback_deploy", kwargs))
+                self.entered.set()
+                await asyncio.Event().wait()
+
+            toolset.write["rollback_deploy"].coroutine = stuck
+            return toolset
+
+    stuck = StuckRollback()
+    stuck.entered = asyncio.Event()
+    async with serve(build_app(settings, stuck, "rollback_deploy")) as client:
+        investigation_id = await start(client)
+        await wait_for(client, investigation_id, {"awaiting_approval"})
+        await client.post(
+            f"/investigations/{investigation_id}/decision", json={"decision": "approve"}
+        )
+        await asyncio.wait_for(stuck.entered.wait(), 5)
+
+    after_restart = FakeTools()
+    async with serve(build_app(settings, after_restart, "rollback_deploy")) as client:
+        body = (await client.get(f"/investigations/{investigation_id}")).json()
+    assert body["status"] == "failed"
+    assert "Check the deploy history" in body["error"]
+    assert after_restart.sessions == 0
 
 
 async def test_failed_tool_session_keeps_the_approval_request_open(settings, tools):
