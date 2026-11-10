@@ -1,0 +1,23 @@
+id: payments-outage-orders-config-change
+title: Payments goes down just after orders changes its payments timeout
+description: >
+  Payments stops serving. Three minutes earlier, orders shipped a config change that raises
+  its payments call timeout from 2000 ms to 3000 ms, so the deploy history points at orders.
+  Payments' own health check is failing; the timeout change cannot cause a 503 from payments.
+alert:
+  title: Checkout error rate above SLO
+  service: storefront
+  details: POST /checkout is returning 502 Bad Gateway for most requests.
+fault:
+  type: dependency_outage
+  target: payments
+distractors:
+  - {type: config_deploy, service: orders, minutes_ago: 7}
+expected:
+  root_cause_service: payments
+  category: dependency_outage
+  action: {type: escalate, target_service: payments}
+relevant_services: [payments, orders, storefront]
+required_evidence:
+  - {tool: get_service_health}
+  - {tool: get_recent_deploys}

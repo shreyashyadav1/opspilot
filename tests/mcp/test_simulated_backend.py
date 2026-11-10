@@ -1,6 +1,7 @@
 """The simulated backend must reproduce each fault's signature, deterministically."""
 
 import pytest
+from pydantic import ValidationError
 
 from opspilot_mcp.backends.simulated import Distractor, SimulatedBackend
 from opspilot_mcp.logsearch import search_logs
@@ -82,6 +83,42 @@ async def test_distractor_deploy_is_benign(simulate):
     [deploy] = await backend.deploys(None, 30)
     assert deploy.service == "payments"
     assert deploy.config_diff == {}
+
+
+async def test_config_distractor_shows_a_harmless_config_diff(simulate):
+    backend = simulate(
+        "dependency_outage",
+        "payments",
+        distractors=[Distractor(type="config_deploy", service="orders", minutes_ago=7)],
+    )
+    [deploy] = await backend.deploys(None, 30)
+    assert (deploy.service, deploy.version, deploy.previous_version) == ("orders", "1.8.4", "1.8.3")
+    assert deploy.config_diff == {"payments.timeout-ms": {"from": 2000, "to": 3000}}
+    # Rolling the distractor back is allowed but leaves the fault in place.
+    await backend.rollback("orders", "suspected timeout change")
+    assert not backend.resolved
+    assert (await backend.health("payments")).status == "unhealthy"
+
+
+def test_config_distractor_needs_a_harmless_change_for_the_service():
+    with pytest.raises(ValidationError, match="no harmless config change"):
+        Distractor(type="config_deploy", service="payments")
+
+
+async def test_rollback_after_an_earlier_deploy_of_the_same_service(simulate):
+    backend = simulate(
+        "bad_config_deploy",
+        "payments",
+        distractors=[Distractor(service="payments", minutes_ago=50)],
+    )
+    deploys = sorted(await backend.deploys("payments", 60), key=lambda d: d.deployed_at)
+    assert [(d.version, bool(d.config_diff)) for d in deploys] == [
+        ("3.2.1", False),
+        ("3.2.2", True),
+    ]
+    event = await backend.rollback("payments", "rounding errors since 3.2.2")
+    assert (event.version, event.previous_version) == ("3.2.1", "3.2.2")
+    assert backend.resolved
 
 
 @pytest.mark.parametrize(

@@ -1,0 +1,20 @@
+id: payments-error-spike-low-rate
+title: A small share of charges fail in payments
+description: >
+  12% of charges fail with a TypeError in settlement. At the storefront this is a modest rise
+  in checkout errors, close to the SLO, and easy to dismiss as noise.
+alert:
+  title: Checkout error rate above SLO
+  service: storefront
+  details: POST /checkout 5xx rate is slightly above the 2% SLO.
+fault:
+  type: error_spike
+  target: payments
+  params: {error_rate: 0.12}
+expected:
+  root_cause_service: payments
+  category: error_rate
+  action: {type: escalate, target_service: payments}
+relevant_services: [payments, orders, storefront]
+required_evidence:
+  - {tool: search_logs, service: payments}

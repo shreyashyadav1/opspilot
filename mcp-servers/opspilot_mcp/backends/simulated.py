@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from opspilot_mcp.catalog import CATALOG, SERVICES, ServiceName
 from opspilot_mcp.models import BackendError, DeployEvent, HealthReport, LogEntry, Series
@@ -33,9 +33,22 @@ class FaultSpec(BaseModel):
 
 
 class Distractor(BaseModel):
-    type: Literal["benign_deploy"] = "benign_deploy"
+    """A change that lands near the incident but does not cause it.
+
+    `benign_deploy` ships code with no config change; `config_deploy` ships a harmless config
+    change (see HARMLESS_CONFIG_CHANGES), which reads like a plausible culprit in the deploy
+    history.
+    """
+
+    type: Literal["benign_deploy", "config_deploy"] = "benign_deploy"
     service: ServiceName
     minutes_ago: float = Field(5.0, ge=0, le=600)
+
+    @model_validator(mode="after")
+    def _harmless_change_exists(self) -> Distractor:
+        if self.type == "config_deploy" and self.service not in HARMLESS_CONFIG_CHANGES:
+            raise ValueError(f"no harmless config change is defined for {self.service}")
+        return self
 
 
 class SimulationSpec(BaseModel):
@@ -133,6 +146,21 @@ _BENIGN = {
     "storefront": ("Update copy on the order confirmation page", "a.nguyen"),
     "orders": ("Add request id to structured log fields", "m.garcia"),
     "payments": ("Upgrade HTTP client library to the latest patch", "l.chen"),
+}
+# (summary, author, {key: (from, to)}): config changes that the live services accept and that
+# leave behaviour under the demo traffic unchanged. Shared with the live benchmark environment.
+# Payments has none: each of its config keys changes what a charge produces.
+HARMLESS_CONFIG_CHANGES: dict[str, tuple[str, str, dict[str, tuple[Any, Any]]]] = {
+    "storefront": (
+        "Raise the per-order item limit for bulk buyers",
+        "a.nguyen",
+        {"max_items_per_order": (20, 30)},
+    ),
+    "orders": (
+        "Give payment calls more headroom during acquirer maintenance",
+        "m.garcia",
+        {"payments.timeout-ms": (2000, 3000)},
+    ),
 }
 
 _PY_KEYERROR = (
@@ -382,16 +410,23 @@ class SimulatedBackend:
                 author=author,
                 change_summary=summary,
             )
-        changes: list[tuple[datetime, str, bool]] = [
-            (self.now - timedelta(minutes=d.minutes_ago), d.service, False)
+        changes: list[tuple[datetime, str, str]] = [
+            (self.now - timedelta(minutes=d.minutes_ago), d.service, d.type)
             for d in self.spec.distractors
         ]
         if self.fault and self.fault.type == "bad_config_deploy":
-            changes.append((self.onset, self.fault.target, True))
-        for when, service, bad in sorted(changes):
+            changes.append((self.onset, self.fault.target, "bad_config_deploy"))
+        for when, service, kind in sorted(changes):
             current = self._current(service).version
             major, minor, patch = current.split(".")
-            summary, author, diff = _BAD_CONFIG[service] if bad else (*_BENIGN[service], {})
+            bad = kind == "bad_config_deploy"
+            if bad:
+                summary, author, diff = _BAD_CONFIG[service]
+            elif kind == "config_deploy":
+                summary, author, values = HARMLESS_CONFIG_CHANGES[service]
+                diff = {key: {"from": old, "to": new} for key, (old, new) in values.items()}
+            else:
+                summary, author, diff = (*_BENIGN[service], {})
             event = self._add_event(
                 service=service,
                 kind="deploy",

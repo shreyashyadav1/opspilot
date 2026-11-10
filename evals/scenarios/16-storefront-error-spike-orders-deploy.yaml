@@ -1,0 +1,22 @@
+id: storefront-error-spike-orders-deploy
+title: Storefront pricing bug, with an orders deploy minutes before
+description: >
+  25% of checkouts fail with a KeyError in storefront's promo pricing. Orders shipped a
+  code-only deploy two minutes before the errors started; orders' own metrics stay healthy.
+alert:
+  title: Checkout error rate above SLO
+  service: storefront
+  details: POST /checkout is returning 500 Internal Server Error for some requests.
+fault:
+  type: error_spike
+  target: storefront
+  params: {error_rate: 0.25}
+distractors:
+  - {type: benign_deploy, service: orders, minutes_ago: 6}
+expected:
+  root_cause_service: storefront
+  category: error_rate
+  action: {type: escalate, target_service: storefront}
+relevant_services: [storefront, orders]
+required_evidence:
+  - {tool: search_logs, service: storefront}

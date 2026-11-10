@@ -37,6 +37,7 @@ from opspilot_agent.llm.fake import ScriptedChatModel
 from opspilot_agent.mcp_client import ToolSet, mcp_toolset, stdio_connection
 from opspilot_agent.prompts import alert_message
 from opspilot_agent.schemas import ApprovalDecision
+from opspilot_api.auth import ANONYMOUS, Principal
 from opspilot_api.errors import ApiError
 from opspilot_api.schemas import (
     OUTCOME_STATUS,
@@ -146,6 +147,7 @@ class InvestigationService:
             attributes={
                 "opspilot.approval.approved": record.approval.approved,
                 "opspilot.approval.reviewer": record.approval.reviewer,
+                "opspilot.approval.authenticated": record.approval.authenticated,
             },
         )
         span.end(end_time=end_ns)
@@ -195,7 +197,17 @@ class InvestigationService:
         self._spawn(self._investigate(record.id, model), name=f"investigate-{record.id}")
         return record
 
-    async def decide(self, investigation_id: str, decision: Decision) -> InvestigationRecord:
+    async def decide(
+        self, investigation_id: str, decision: Decision, principal: Principal = ANONYMOUS
+    ) -> InvestigationRecord:
+        if principal.authenticated:
+            if decision.reviewer is not None and decision.reviewer != principal.name:
+                raise ApiError(
+                    422, f"reviewer is taken from the API key ({principal.name}); omit it"
+                )
+            reviewer = principal.name or ""
+        else:
+            reviewer = decision.reviewer or "operator"
         async with self._locks[investigation_id]:
             record = await self.get(investigation_id)
             if record.status != "awaiting_approval":
@@ -209,9 +221,10 @@ class InvestigationService:
             approved = decision.decision == "approve"
             record.approval = Approval(
                 approved=approved,
-                reviewer=decision.reviewer,
+                reviewer=reviewer,
                 comment=decision.comment,
                 decided_at=utcnow(),
+                authenticated=principal.authenticated,
             )
             if approved:
                 record.status = "executing"
@@ -222,14 +235,15 @@ class InvestigationService:
                 "decision",
                 {
                     "decision": decision.decision,
-                    "reviewer": decision.reviewer,
+                    "reviewer": reviewer,
                     "comment": decision.comment,
+                    "authenticated": principal.authenticated,
                 },
             )
-            log.info("%s %sd by %s", investigation_id, decision.decision, decision.reviewer)
+            log.info("%s %sd by %s", investigation_id, decision.decision, reviewer)
             resume = Command(
                 resume=ApprovalDecision(
-                    approved=approved, reviewer=decision.reviewer, comment=decision.comment
+                    approved=approved, reviewer=reviewer, comment=decision.comment
                 ).model_dump()
             )
             if approved:

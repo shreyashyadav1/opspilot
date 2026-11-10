@@ -96,6 +96,7 @@ async def test_approved_rollback_is_executed_exactly_once(settings, tools):
         assert done["status"] == "executed"
         assert done["approval"]["approved"] is True
         assert done["approval"]["reviewer"] == "alice"
+        assert done["approval"]["authenticated"] is False
         assert done["approval_state"] == "approved"
         assert done["action_result"]["ok"] is True
         assert done["action_result"]["args"]["service"] == "orders"
@@ -106,6 +107,7 @@ async def test_approved_rollback_is_executed_exactly_once(settings, tools):
             "decision": "approve",
             "reviewer": "alice",
             "comment": "matches the deploy",
+            "authenticated": False,
         }
 
         again = await client.post(

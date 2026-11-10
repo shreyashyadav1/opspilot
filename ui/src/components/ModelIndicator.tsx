@@ -2,6 +2,7 @@
 
 import { AlertTriangle } from "lucide-react";
 
+import { ApiError } from "@/lib/api";
 import { useConfig } from "@/lib/hooks";
 
 import { ModelBadge } from "./ModelBadge";
@@ -9,6 +10,10 @@ import styles from "./AppHeader.module.css";
 
 export function ModelIndicator() {
   const { data, error } = useConfig();
+  // 401: the API wants a key, which the sign-in field beside this asks for.
+  if (error instanceof ApiError && error.status === 401) {
+    return <p className={styles.model} aria-hidden="true" />;
+  }
   if (error) {
     return (
       <p className={styles.model} role="status">

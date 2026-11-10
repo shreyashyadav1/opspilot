@@ -16,7 +16,7 @@ from opspilot_agent.mcp_client import stdio_connection
 from opspilot_evals.scenario import FAULT_CATEGORY, Scenario
 from opspilot_evals.scoring import GroundTruth
 from opspilot_mcp.backends.live import LiveBackend
-from opspilot_mcp.backends.simulated import SimulationSpec
+from opspilot_mcp.backends.simulated import HARMLESS_CONFIG_CHANGES, Distractor, SimulationSpec
 from opspilot_mcp.catalog import SERVICES
 
 log = logging.getLogger(__name__)
@@ -27,6 +27,23 @@ BENIGN_CHANGES = {
     "orders": ("Add request id to structured log fields", "m.garcia"),
     "payments": ("Upgrade HTTP client library to the latest patch", "l.chen"),
 }
+
+
+def distractor_deploy(distractor: Distractor) -> dict[str, Any]:
+    """Control-plane deploy request for a distractor (the same change the simulation shows)."""
+    config: dict[str, Any] = {}
+    if distractor.type == "config_deploy":
+        summary, author, values = HARMLESS_CONFIG_CHANGES[distractor.service]
+        config = {key: new for key, (_, new) in values.items()}
+    else:
+        summary, author = BENIGN_CHANGES[distractor.service]
+    return {
+        "service": distractor.service,
+        "change_summary": summary,
+        "author": author,
+        "config": config,
+        "minutes_ago": distractor.minutes_ago,
+    }
 
 
 @dataclass
@@ -130,17 +147,9 @@ class LiveEnvironment:
         await self._post("/chaos/reset")
         await self.wait_until_healthy()
         await asyncio.sleep(self.cooldown_seconds)
-        for distractor in scenario.distractors:
-            summary, author = BENIGN_CHANGES[distractor.service]
-            await self._post(
-                "/deploys",
-                {
-                    "service": distractor.service,
-                    "change_summary": summary,
-                    "author": author,
-                    "minutes_ago": distractor.minutes_ago,
-                },
-            )
+        # Oldest first, so each deploy's previous version is the one that ran before it.
+        for distractor in sorted(scenario.distractors, key=lambda d: -d.minutes_ago):
+            await self._post("/deploys", distractor_deploy(distractor))
         record = await self._post(
             "/chaos/faults",
             {
