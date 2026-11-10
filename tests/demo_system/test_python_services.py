@@ -17,11 +17,11 @@ from opsdemo.storefront import app as storefront_module
 
 @pytest.fixture
 def payments():
-    payments_module.runtime.failures = FailureModes()
+    payments_module.runtime.set_failures(FailureModes())
     payments_module.runtime.config = dict(payments_module.DEFAULT_CONFIG)
     with TestClient(payments_module.app) as client:
         yield client
-    payments_module.runtime.failures = FailureModes()
+    payments_module.runtime.set_failures(FailureModes())
 
 
 def orders_stub(handler):
@@ -37,11 +37,11 @@ def orders_stub(handler):
 
 @pytest.fixture
 def storefront():
-    storefront_module.runtime.failures = FailureModes()
+    storefront_module.runtime.set_failures(FailureModes())
     storefront_module.runtime.config = dict(storefront_module.DEFAULT_CONFIG)
     with TestClient(storefront_module.app) as client:
         yield client
-    storefront_module.runtime.failures = FailureModes()
+    storefront_module.runtime.set_failures(FailureModes())
 
 
 CHECKOUT = {"customer_id": "cust-0001", "items": [{"sku": "SKU-1001", "quantity": 2}]}
@@ -85,6 +85,51 @@ def test_outage_blocks_everything_except_admin(payments):
     assert payments.get("/admin/failures").json()["outage"] is True
     payments.delete("/admin/failures")
     assert payments.get("/health").json()["status"] == "ok"
+
+
+def test_memory_leak_fails_requests_once_its_budget_is_used(payments, caplog):
+    # 4 MB per charge against an 8 MB budget: two charges succeed, the third cannot allocate.
+    payments.put(
+        "/admin/failures",
+        json={"memory_leak_kb_per_request": 4096, "memory_leak_limit_mb": 8},
+    )
+    charge = {"order_id": 7, "amount_cents": 1999}
+    with caplog.at_level(logging.ERROR):
+        codes = [payments.post("/charges", json=charge).status_code for _ in range(3)]
+    assert codes == [201, 201, 500]
+    assert payments_module.runtime.memo.size_bytes == 8 * 1024 * 1024
+    [record] = json_records(caplog, "http.server")
+    assert record.exc_info[0] is MemoryError
+    # Probes keep passing: the service looks up while every business request fails.
+    assert payments.get("/health").json()["status"] == "ok"
+
+    payments.delete("/admin/failures")
+    assert payments_module.runtime.memo.size_bytes == 0
+    assert payments.post("/charges", json=charge).status_code == 201
+
+
+def test_simulated_memory_error_trace_matches_the_live_one(payments, caplog):
+    from opspilot_mcp.backends.simulated import _PY_MEMORYERROR
+
+    payments.put(
+        "/admin/failures",
+        json={"memory_leak_kb_per_request": 4096, "memory_leak_limit_mb": 8},
+    )
+    with caplog.at_level(logging.ERROR):
+        for _ in range(3):
+            payments.post("/charges", json={"order_id": 7, "amount_cents": 1999})
+    [record] = json_records(caplog, "http.server")
+    frames = [
+        (f.filename.split("/opsdemo/")[-1], f.lineno, f.name)
+        for f in traceback.extract_tb(record.exc_info[2])
+    ]
+    simulated = [
+        (line.split('"')[1].split("/opsdemo/")[-1], int(line.split("line ")[1].split(",")[0]),
+         line.rsplit(" in ", 1)[1])
+        for line in _PY_MEMORYERROR.splitlines()
+        if line.lstrip().startswith("File ")
+    ]  # fmt: skip
+    assert frames[-len(simulated) :] == simulated
 
 
 def test_admin_and_probe_traffic_is_not_measured(payments):

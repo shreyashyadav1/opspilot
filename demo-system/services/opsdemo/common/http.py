@@ -87,6 +87,7 @@ class TelemetryMiddleware:
 
         method: str = scope["method"]
         try:
+            self.runtime.remember_request(path)
             await self.app(scope, receive, send_wrapper)
         except Exception:
             status = 500

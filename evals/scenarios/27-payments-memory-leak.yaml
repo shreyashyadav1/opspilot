@@ -1,0 +1,22 @@
+id: payments-memory-leak
+title: A memory leak in payments ends in MemoryError on every charge
+description: >
+  Every charge retains 256 KB that is never freed. Resident memory in payments climbs for about
+  two minutes until its 64 MB budget is used up, then every charge fails with MemoryError before
+  it reaches the handler. Health checks still pass, so payments looks up; the errors read like
+  an error spike unless the memory curve or the exception type is checked.
+alert:
+  title: Checkout error rate above SLO
+  service: storefront
+  details: POST /checkout 5xx rate is well above the 2% SLO.
+fault:
+  type: memory_leak
+  target: payments
+  params: {kb_per_request: 256, limit_mb: 64}
+expected:
+  root_cause_service: payments
+  category: resource_exhaustion
+  action: {type: restart_service, target_service: payments}
+relevant_services: [payments, orders, storefront]
+required_evidence:
+  - {tool: search_logs, service: payments}

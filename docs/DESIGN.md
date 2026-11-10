@@ -157,6 +157,7 @@ and log messages look like genuine failures, not like a chaos tool.
 | `db_pool_exhaustion` | `resource_exhaustion` | orders | A background export job leaks JDBC connections until the pool is empty | Pool active = max, pending > 0, "Connection is not available" errors, leak-detection warnings, health DOWN |
 | `bad_config_deploy` | `bad_deploy` | storefront, orders, payments | Records a deploy with a config diff, then applies the bad config | Errors start right after a deploy; the error text matches the changed setting |
 | `dependency_outage` | `dependency_outage` | orders, payments | Service stops serving: 503 everywhere, health fails, scrapes fail | `up == 0`, no fresh logs from the target, connection errors and 5xx in callers |
+| `memory_leak` | `resource_exhaustion` | storefront, payments | Every business request retains a buffer that is never freed (256 KB by default) until a budget (64 MB, below the 160 MB container limit) is used up; clearing the fault frees it, like a restart | `memory_used_mb` climbs for a few minutes, then every request fails with MemoryError; health checks still pass, so it reads like an error spike unless memory or the exception type is checked |
 
 Each injected fault is stored with its ground truth `{service, category}`, parameters and
 timestamps. `rollback_deploy` on the service that received a bad config resolves that fault,
@@ -177,8 +178,8 @@ Built with the official Python MCP SDK (`FastMCP`). Tools:
 Design choices:
 
 - **Named metrics instead of raw PromQL.** The model picks from `request_rate`, `error_rate`,
-  `latency_p50/p95/p99`, `upstream_error_rate`, `db_pool_active`, `db_pool_pending` and `up`.
-  The server owns the PromQL. This removes a whole class of malformed-query failures and
+  `latency_p50/p95/p99`, `upstream_error_rate`, `db_pool_active`, `db_pool_pending`,
+  `memory_used_mb` and `up`. The server owns the PromQL. This removes a whole class of malformed-query failures and
   keeps the tool surface small enough to evaluate.
 - **Summaries, not dumps.** Log search groups repeated messages and truncates stack traces;
   metric queries return a handful of points plus summary statistics. Tool output size drives
@@ -467,7 +468,7 @@ Rules and caveats:
   (for example raising orders' payments timeout from 2000 to 3000 ms), so "the deploy with a
   config change" is not a reliable shortcut either; the agent has to check that the change can
   explain the symptoms and lines up with their start.
-- The 26 scenarios cover every fault type on every service it can target, at mild and severe
+- The 28 scenarios cover every fault type on every service it can target, at mild and severe
   settings, with zero, one or two distractors.
 - Live scenarios run back to back, so earlier incidents stay visible in the metric window. The
   runner waits two minutes of healthy traffic after each reset, scenario order interleaves
@@ -511,7 +512,7 @@ Rules and caveats:
   - [x] LangGraph agent with validated diagnosis and interrupt-based approval gate
   - [x] CLI for interactive investigations
 - [ ] **M4: Benchmark**
-  - [x] Scenario format and 25+ scenarios (26 today, with code-only and config-change distractors)
+  - [x] Scenario format and 25+ scenarios (28 today, with code-only and config-change distractors)
   - [x] Runner, scorer, JSON and Markdown reports
   - [x] Deterministic CI run with the playbook model
   - [ ] First real benchmark run against a hosted model, published with model, date and commit

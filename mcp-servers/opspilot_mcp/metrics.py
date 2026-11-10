@@ -23,6 +23,7 @@ MetricName = Literal[
     "upstream_latency_p95",
     "db_pool_active",
     "db_pool_pending",
+    "memory_used_mb",
     "up",
 ]
 METRIC_NAMES: tuple[str, ...] = get_args(MetricName)
@@ -90,6 +91,14 @@ METRICS: dict[str, MetricDefinition] = {
         "Threads waiting for a database connection.",
         'sum(hikaricp_connections_pending{job="$job"})',
         only_for=("orders",),
+    ),
+    "memory_used_mb": MetricDefinition(
+        "MB",
+        "Resident memory of the process (storefront, payments); JVM heap in use (orders).",
+        # prometheus_client's process collector for the Python services, Micrometer's JVM
+        # metrics for orders.
+        '(max(process_resident_memory_bytes{job="$job"}) or '
+        'sum(jvm_memory_used_bytes{job="$job",area="heap"})) / 1048576',
     ),
     "up": MetricDefinition(
         "bool",

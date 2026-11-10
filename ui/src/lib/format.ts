@@ -58,6 +58,7 @@ const FAULT: Record<string, string> = {
   db_pool_exhaustion: "Database pool exhaustion",
   bad_config_deploy: "Bad config deploy",
   dependency_outage: "Dependency outage",
+  memory_leak: "Memory leak",
 };
 
 const SOURCE: Record<string, string> = {

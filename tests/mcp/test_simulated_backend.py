@@ -46,6 +46,38 @@ async def test_pool_exhaustion_signature(simulate):
     assert "Connection is not available" in await error_messages(backend, "orders")
 
 
+async def test_memory_leak_grows_memory_then_fails_every_request(simulate):
+    backend = simulate("memory_leak", "payments")
+    series = await backend.metric_series("payments", "memory_used_mb", 15)
+    summary = summarize_metric("payments", "memory_used_mb", 15, series)["series"][0]
+    assert summary["baseline"] < 70
+    assert 125 < summary["latest"] < 135  # baseline plus the 64 MB budget
+    assert summary["trend"] == "rising"
+    assert await latest(backend, "orders", "memory_used_mb") < 125
+    assert await latest(backend, "payments", "error_rate") > 0.9
+    assert (await backend.health("payments")).status == "healthy"
+    errors = search_logs(await backend.log_entries("payments", 15), level="ERROR")
+    assert {r["error_type"] for r in errors["recent"]} == {"MemoryError"}
+    assert "returned HTTP 500" in await error_messages(backend, "orders")
+
+
+async def test_memory_leak_is_silent_until_the_budget_is_used(simulate):
+    # One minute in, payments has retained about 33 of its 64 MB.
+    backend = simulate("memory_leak", "payments", onset_minutes_ago=1)
+    assert 90 < await latest(backend, "payments", "memory_used_mb") < 110
+    assert await latest(backend, "payments", "error_rate") < 0.01
+    assert await error_messages(backend, "payments") == ""
+
+
+async def test_storefront_memory_leak_stops_its_downstream_traffic(simulate):
+    backend = simulate("memory_leak", "storefront")
+    assert await latest(backend, "storefront", "error_rate") > 0.9
+    assert await latest(backend, "orders", "request_rate") is None or (
+        await latest(backend, "orders", "request_rate") < 0.1
+    )
+    assert "Unhandled exception" in await error_messages(backend, "storefront")
+
+
 async def test_payments_outage_stops_its_telemetry(simulate):
     backend = simulate("dependency_outage", "payments")
     assert await latest(backend, "payments", "up") == 0

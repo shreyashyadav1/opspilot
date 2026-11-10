@@ -22,7 +22,12 @@ from opspilot_mcp.catalog import CATALOG, SERVICES, ServiceName
 from opspilot_mcp.models import BackendError, DeployEvent, HealthReport, LogEntry, Series
 
 FaultType = Literal[
-    "latency_spike", "error_spike", "db_pool_exhaustion", "bad_config_deploy", "dependency_outage"
+    "latency_spike",
+    "error_spike",
+    "db_pool_exhaustion",
+    "bad_config_deploy",
+    "dependency_outage",
+    "memory_leak",
 ]
 
 
@@ -70,6 +75,8 @@ BASE_LATENCY = {
     "payments": (12.0, 22.0, 30.0),
 }
 BASE_ERROR = {"storefront": 0.002, "orders": 0.001, "payments": 0.0}
+# MB: resident memory of the Python services, JVM heap in use for orders.
+BASE_MEMORY = {"storefront": 74.0, "orders": 118.0, "payments": 66.0}
 CHECKOUT_SHARE = 0.55  # of storefront traffic; goes storefront -> orders -> payments
 ORDERS_SHARE = 0.70  # of storefront traffic that calls orders (checkout + lookups)
 ORDERS_POST_SHARE = 2.2 / 2.8  # of orders traffic that calls payments
@@ -181,6 +188,14 @@ _PY_CONFIGERROR = (
     "opsdemo.payments.app.ConfigurationError: unsupported rounding_mode 'BANKERS'; "
     "expected one of HALF_EVEN, HALF_UP"
 )
+# Mirrors the live memory-leak failure mode (opsdemo/common/memo.py).
+_PY_MEMORYERROR = (
+    "Traceback (most recent call last):\n"
+    '  File "/app/opsdemo/common/http.py", line 90, in __call__\n'
+    '  File "/app/opsdemo/common/runtime.py", line 84, in remember_request\n'
+    '  File "/app/opsdemo/common/memo.py", line 30, in remember\n'
+    "MemoryError"
+)
 _JAVA_NPE = (
     'java.lang.NullPointerException: Cannot invoke "java.math.BigDecimal.negate()" because '
     '"discount" is null\n'
@@ -205,6 +220,7 @@ class ServiceState:
     upstream_error: float = 0.0
     upstream_p95: float = 0.0
     pool: tuple[float, float] | None = None
+    memory_mb: float = 0.0
 
     def slower(self, delay_ms: float) -> None:
         self.latency = tuple(v + delay_ms for v in self.latency)  # type: ignore[assignment]
@@ -248,16 +264,25 @@ class SimulatedBackend:
                 latency=BASE_LATENCY[s],
                 upstream_p95=BASE_LATENCY[UPSTREAM[s]][1] + 3 if s in UPSTREAM else 0.0,
                 pool=(1.0, 0.0) if s == "orders" else None,
+                memory_mb=BASE_MEMORY[s],
             )
             for s in SERVICES
         }
         if self._fault_active(t):
             assert self.fault is not None
-            self._apply_fault(states, self.fault)
+            self._apply_fault(states, self.fault, (t - self.onset).total_seconds())
         return states
 
     @staticmethod
-    def _apply_fault(states: dict[str, ServiceState], fault: FaultSpec) -> None:
+    def _leaked_mb(fault: FaultSpec, elapsed_s: float) -> tuple[float, bool]:
+        """Memory retained by a leak after `elapsed_s`, and whether its budget is used up."""
+        kb = float(fault.params.get("kb_per_request", 256))
+        limit = float(fault.params.get("limit_mb", 64))
+        grown = BASE_RATE[fault.target] * kb / 1024 * elapsed_s
+        return min(grown, limit), grown >= limit
+
+    @staticmethod
+    def _apply_fault(states: dict[str, ServiceState], fault: FaultSpec, elapsed_s: float) -> None:
         sf, orders, pay = states["storefront"], states["orders"], states["payments"]
         target = fault.target
         match fault.type:
@@ -310,6 +335,19 @@ class SimulatedBackend:
                 else:
                     sf.error, sf.upstream_error, sf.upstream_p95 = ORDERS_SHARE, 1.0, 5.0
                     pay.rate = 0.0
+            case "memory_leak":
+                leaked, exhausted = SimulatedBackend._leaked_mb(fault, elapsed_s)
+                states[target].memory_mb += leaked
+                if not exhausted:
+                    return
+                # Every business request now fails before it reaches the handler.
+                if target == "payments":
+                    pay.error = 1.0
+                    orders.error, orders.upstream_error = ORDERS_POST_SHARE, 1.0
+                    sf.error, sf.upstream_error = CHECKOUT_SHARE, ORDERS_POST_SHARE
+                else:
+                    sf.error = 1.0
+                    orders.rate, pay.rate = 0.0, 0.0
 
     # -- metrics -----------------------------------------------------------------------------
 
@@ -338,6 +376,8 @@ class SimulatedBackend:
                 return state.pool[0] if state.pool else None
             case "db_pool_pending":
                 return state.pool[1] if state.pool else None
+            case "memory_used_mb":
+                return state.memory_mb * self._noise(service, metric, i) ** 0.1
         raise BackendError(f"unknown metric {metric}")
 
     async def metric_series(self, service: str, metric: str, window_minutes: int) -> list[Series]:
@@ -525,6 +565,8 @@ class SimulatedBackend:
     def _affected_requests(self, states: dict[str, ServiceState]) -> int:
         """Sampled number of failing (or slow) requests per step while the fault is active."""
         assert self.fault is not None
+        if self.fault.type == "memory_leak" and states[self.fault.target].error < 1.0:
+            return 0  # still leaking: nothing fails yet
         share = (
             CHECKOUT_SHARE
             if self.fault.type == "latency_spike"
@@ -737,6 +779,30 @@ class SimulatedBackend:
                     ),
                     _Line("payments", "WARN", "http.access", f"POST /charges 500 {ms}ms"),
                     *orders_payment_failed("", 500),
+                ]
+            case "memory_leak", "payments":
+                return [
+                    _Line(
+                        "payments",
+                        "ERROR",
+                        "http.server",
+                        "Unhandled exception while handling POST /charges",
+                        {"error_type": "MemoryError", "stack_trace": _PY_MEMORYERROR},
+                    ),
+                    _Line("payments", "WARN", "http.access", f"POST /charges 500 {ms // 10 + 1}ms"),
+                    *orders_payment_failed("", 500),
+                ]
+            case "memory_leak", "storefront":
+                path = rng.choice(["POST /checkout", "GET /products", "GET /orders/1042"])
+                return [
+                    _Line(
+                        "storefront",
+                        "ERROR",
+                        "http.server",
+                        f"Unhandled exception while handling {path}",
+                        {"error_type": "MemoryError", "stack_trace": _PY_MEMORYERROR},
+                    ),
+                    _Line("storefront", "WARN", "http.access", f"{path} 500 {ms // 10 + 1}ms"),
                 ]
             case "dependency_outage", "payments":
                 return orders_payment_failed("", 503)
