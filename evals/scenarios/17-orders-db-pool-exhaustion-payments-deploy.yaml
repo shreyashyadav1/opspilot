@@ -1,0 +1,22 @@
+id: orders-db-pool-exhaustion-payments-deploy
+title: Orders connection pool runs dry, with a payments deploy nearby
+description: >
+  An export job leaks connections until the orders pool is empty. Payments deployed a library
+  upgrade a minute before the errors began, and its traffic drops sharply because orders can
+  no longer create orders, which makes payments look involved.
+alert:
+  title: Checkout error rate above SLO
+  service: storefront
+  details: POST /checkout 5xx rate is above the 2% SLO; latency is elevated too.
+fault:
+  type: db_pool_exhaustion
+  target: orders
+distractors:
+  - {type: benign_deploy, service: payments, minutes_ago: 5}
+expected:
+  root_cause_service: orders
+  category: resource_exhaustion
+  action: {type: restart_service, target_service: orders}
+relevant_services: [orders, storefront, payments]
+required_evidence:
+  - {tool: search_logs, service: orders}

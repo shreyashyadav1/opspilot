@@ -1,0 +1,21 @@
+id: orders-outage-storefront-deploy
+title: Orders goes down right after a storefront deploy
+description: >
+  Orders stops serving. Storefront shipped a code-only deploy three minutes earlier and is
+  the service the alert names, but storefront is healthy and only reports orders' 503s.
+alert:
+  title: Checkout and order lookup errors
+  service: storefront
+  details: POST /checkout and GET /orders/{id} are failing with 5xx responses.
+fault:
+  type: dependency_outage
+  target: orders
+distractors:
+  - {type: benign_deploy, service: storefront, minutes_ago: 7}
+expected:
+  root_cause_service: orders
+  category: dependency_outage
+  action: {type: escalate, target_service: orders}
+relevant_services: [orders, storefront]
+required_evidence:
+  - {tool: get_service_health}

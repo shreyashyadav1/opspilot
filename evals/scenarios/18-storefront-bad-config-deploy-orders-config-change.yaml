@@ -1,0 +1,23 @@
+id: storefront-bad-config-deploy-orders-config-change
+title: Two config deploys; only the storefront one is bad
+description: >
+  Orders raised its payments timeout ten minutes ago; storefront then shipped a change that
+  lowers its orders timeout to 20 ms. Both deploys carry config diffs. Only the storefront one
+  lines up with the errors, and orders' own metrics are healthy.
+alert:
+  title: Checkout error rate above SLO
+  service: storefront
+  details: POST /checkout is returning 504 Gateway Timeout for a large share of requests.
+fault:
+  type: bad_config_deploy
+  target: storefront
+distractors:
+  - {type: config_deploy, service: orders, minutes_ago: 10}
+expected:
+  root_cause_service: storefront
+  category: bad_deploy
+  action: {type: rollback_deploy, target_service: storefront}
+relevant_services: [storefront, orders]
+required_evidence:
+  - {tool: get_recent_deploys}
+  - {tool: search_logs, service: storefront}

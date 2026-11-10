@@ -1,0 +1,24 @@
+id: payments-error-spike-two-deploys
+title: Payments settlement bug, with deploys of the other two services nearby
+description: >
+  40% of charges fail with a TypeError in settlement. Orders and storefront each shipped a
+  code-only deploy in the last ten minutes. Neither touches payments, and the stack trace is
+  in payments' own code.
+alert:
+  title: Checkout error rate above SLO
+  service: storefront
+  details: POST /checkout 5xx rate is above the 2% SLO.
+fault:
+  type: error_spike
+  target: payments
+  params: {error_rate: 0.4}
+distractors:
+  - {type: benign_deploy, service: orders, minutes_ago: 9}
+  - {type: benign_deploy, service: storefront, minutes_ago: 6}
+expected:
+  root_cause_service: payments
+  category: error_rate
+  action: {type: escalate, target_service: payments}
+relevant_services: [payments, orders, storefront]
+required_evidence:
+  - {tool: search_logs, service: payments}

@@ -443,7 +443,12 @@ Rules and caveats:
   real run exists.
 - Scenarios contain a single fault each. Some include distractors, such as a harmless deploy of
   an unrelated service just before the fault, to test that the agent does not blame the most
-  recent change by reflex.
+  recent change by reflex. A `config_deploy` distractor ships a real but harmless config diff
+  (for example raising orders' payments timeout from 2000 to 3000 ms), so "the deploy with a
+  config change" is not a reliable shortcut either; the agent has to check that the change can
+  explain the symptoms and lines up with their start.
+- The 26 scenarios cover every fault type on every service it can target, at mild and severe
+  settings, with zero, one or two distractors.
 - Live scenarios run back to back, so earlier incidents stay visible in the metric window. The
   runner waits two minutes of healthy traffic after each reset, scenario order interleaves
   target services, and the metric baseline is the median of the first half of the window.
@@ -484,7 +489,7 @@ Rules and caveats:
   - [x] LangGraph agent with validated diagnosis and interrupt-based approval gate
   - [x] CLI for interactive investigations
 - [ ] **M4: Benchmark**
-  - [x] Scenario format and at least eight scenarios (11 today)
+  - [x] Scenario format and 25+ scenarios (26 today, with code-only and config-change distractors)
   - [x] Runner, scorer, JSON and Markdown reports
   - [x] Deterministic CI run with the playbook model
   - [ ] First real benchmark run against a hosted model, published with model, date and commit

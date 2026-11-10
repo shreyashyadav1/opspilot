@@ -1,0 +1,21 @@
+id: storefront-latency-spike
+title: Storefront itself is slow
+description: >
+  Storefront adds about 900 ms to its own requests. Orders and payments latency is flat, and
+  storefront's upstream call timings are normal, so the slowness is inside storefront rather
+  than anywhere it waits on.
+alert:
+  title: Checkout p95 latency above SLO
+  service: storefront
+  details: POST /checkout and GET /products p95 latency is above the 800 ms SLO.
+fault:
+  type: latency_spike
+  target: storefront
+  params: {delay_ms: 900}
+expected:
+  root_cause_service: storefront
+  category: latency
+  action: {type: escalate, target_service: storefront}
+relevant_services: [storefront]
+required_evidence:
+  - {tool: query_metric, service: storefront}

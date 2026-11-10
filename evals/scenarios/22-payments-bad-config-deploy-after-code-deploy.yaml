@@ -1,0 +1,23 @@
+id: payments-bad-config-deploy-after-code-deploy
+title: Payments ships twice within the hour; the second deploy breaks settlement
+description: >
+  Payments shipped a code-only library upgrade 50 minutes ago and stayed healthy. It then
+  shipped a config change to an unsupported rounding mode, and charges start failing. The
+  right rollback is the latest deploy, not the older one.
+alert:
+  title: Checkout error rate above SLO
+  service: storefront
+  details: POST /checkout is returning 502 Bad Gateway for most requests.
+fault:
+  type: bad_config_deploy
+  target: payments
+distractors:
+  - {type: benign_deploy, service: payments, minutes_ago: 50}
+expected:
+  root_cause_service: payments
+  category: bad_deploy
+  action: {type: rollback_deploy, target_service: payments}
+relevant_services: [payments, orders, storefront]
+required_evidence:
+  - {tool: get_recent_deploys}
+  - {tool: search_logs, service: payments}
