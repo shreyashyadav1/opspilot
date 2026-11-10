@@ -11,6 +11,7 @@ import type { InvestigationDetail } from "@/lib/types";
 
 import { ChangeTrack } from "./ChangeTrack";
 import { GateMark } from "./GateMark";
+import { ReviewerName } from "./ReviewerName";
 import { Signature } from "./Signature";
 import { Button, Notice, uiStyles } from "./ui";
 import styles from "./DecisionPanel.module.css";
@@ -252,7 +253,8 @@ export function DecisionPanel({
         <div className={styles.outcome} ref={outcome} tabIndex={-1} role="status">
           {approval ? (
             <p className={styles.who}>
-              {approval.approved ? "Approved" : "Rejected"} by {approval.reviewer} at{" "}
+              {approval.approved ? "Approved" : "Rejected"} by{" "}
+              <ReviewerName name={approval.reviewer} authenticated={approval.authenticated} /> at{" "}
               <time dateTime={approval.decided_at}>{clockTime(approval.decided_at)}</time>.
               {approval.comment ? (
                 <>

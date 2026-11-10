@@ -75,6 +75,17 @@ describe("DecisionPanel", () => {
     expect(screen.getByRole("status")).toHaveTextContent("orders rolled back from 1.8.4 to 1.8.3.");
   });
 
+  it("marks a reviewer name the API did not check from a key", () => {
+    const { rerender } = render(<DecisionPanel investigation={rejected()} onDecided={() => {}} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Rejected by bob (name not verified) at");
+
+    const signed = executed();
+    signed.approval = { ...signed.approval!, authenticated: true };
+    rerender(<DecisionPanel investigation={signed} onDecided={() => {}} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Approved by alice at");
+    expect(screen.queryByText(/name not verified/)).not.toBeInTheDocument();
+  });
+
   it("says exactly what the rollback changes, from the agent's own evidence", () => {
     render(<DecisionPanel investigation={withDeployHistory()} onDecided={() => {}} />);
     expect(
