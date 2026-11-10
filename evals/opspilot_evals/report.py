@@ -28,6 +28,11 @@ def render_markdown(run: dict[str, Any]) -> str:
         f"- Scenarios: {summary['scenarios']} (repeats per scenario: {meta['repeats']}), "
         f"errors: {summary['errors']}, approval policy: {meta['approval']}",
     ]
+    if summary.get("retried"):
+        lines.append(
+            f"- Re-run after failing before the first step: {summary['retried']} "
+            "(earlier errors are listed under `retried_errors` in results.json)"
+        )
     if meta["environment"] == "simulated":
         lines.append(
             "- Simulated environment: these numbers check the harness and the baseline, "
