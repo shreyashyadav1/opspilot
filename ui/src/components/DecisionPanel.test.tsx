@@ -9,7 +9,7 @@ import {
   rejected,
   withDeployHistory,
 } from "@/test/fixtures";
-import { mockApi } from "@/test/utils";
+import { mockApi, renderWithSWR } from "@/test/utils";
 
 import { DecisionPanel } from "./DecisionPanel";
 
@@ -37,8 +37,9 @@ describe("DecisionPanel", () => {
     await user.type(screen.getByLabelText(/Note/), "Matches the deploy diff");
     await user.click(screen.getByRole("button", { name: "Approve rollback" }));
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [, init] = fetchMock.mock.calls[0]!;
+    const decisions = fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/decision"));
+    expect(decisions).toHaveLength(1);
+    const [, init] = decisions[0]!;
     expect(JSON.parse(String(init?.body))).toEqual({
       decision: "approve",
       reviewer: "alice",
@@ -143,5 +144,30 @@ describe("DecisionPanel", () => {
       />,
     );
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe("DecisionPanel with API keys", () => {
+  it("takes the reviewer from the signed-in key and does not send a name", async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockApi({
+      "/api/me": [200, { name: "alice", role: "approver", authenticated: true }],
+      "POST /api/investigations/inv-0007/decision": [200, executed()],
+    });
+    renderWithSWR(<DecisionPanel investigation={investigation()} onDecided={() => {}} />);
+    expect(await screen.findByText(/from your API key/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Your name")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Approve rollback" }));
+
+    const call = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/decision"));
+    expect(JSON.parse(String(call?.[1]?.body))).toEqual({ decision: "approve", comment: null });
+  });
+
+  it("does not offer the decision to a key without the approver role", async () => {
+    mockApi({ "/api/me": [200, { name: "olly", role: "operator", authenticated: true }] });
+    renderWithSWR(<DecisionPanel investigation={investigation()} onDecided={() => {}} />);
+    expect(await screen.findByText(/needs an approver key/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Approve rollback" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Reject" })).toBeDisabled();
   });
 });

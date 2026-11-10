@@ -13,6 +13,8 @@
 - OPSPILOT_PRICING_FILE: USD-per-million-token price table used to cost each investigation
   (default `evals/pricing.yaml`, the same file the benchmark prices its runs from). A model
   missing from it is reported with unknown cost rather than a guessed one.
+- OPSPILOT_API_KEYS: `name:role:sha256` entries that turn on API-key authentication with
+  viewer, operator and approver roles (see `opspilot_api.auth`). Unset, the API runs open.
 """
 
 from __future__ import annotations
@@ -24,6 +26,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from opspilot_agent.llm import DEFAULT_MODEL
+from opspilot_api.auth import ApiKey, parse_keys
 
 BASELINE_MODEL = "fake:playbook"
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -49,6 +52,7 @@ class ApiSettings:
     pricing_file: Path = field(default_factory=lambda: REPO_ROOT / "evals" / "pricing.yaml")
     max_concurrent: int = 2
     max_turns: int = 12
+    api_keys: tuple[ApiKey, ...] = ()
 
     @property
     def records_db(self) -> Path:
@@ -81,4 +85,5 @@ class ApiSettings:
             pricing_file=Path(pricing) if pricing else defaults.pricing_file,
             max_concurrent=int(os.getenv("OPSPILOT_MAX_CONCURRENT", str(defaults.max_concurrent))),
             max_turns=int(os.getenv("OPSPILOT_MAX_TURNS", str(defaults.max_turns))),
+            api_keys=parse_keys(os.getenv("OPSPILOT_API_KEYS")),
         )

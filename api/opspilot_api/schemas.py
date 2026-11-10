@@ -71,7 +71,8 @@ class Decision(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     decision: Literal["approve", "reject"]
-    reviewer: str = Field("operator", min_length=1, max_length=64)
+    # Only used when the API runs without keys; with keys, the reviewer is the key's name.
+    reviewer: str | None = Field(None, min_length=1, max_length=64)
     comment: str | None = Field(None, max_length=500)
 
 
@@ -99,6 +100,9 @@ class Approval(BaseModel):
     reviewer: str
     comment: str | None = None
     decided_at: datetime
+    # False when the API ran without keys, so the reviewer name was not verified. Records
+    # written before this field existed load as unauthenticated, which they were.
+    authenticated: bool = False
 
 
 class TraceEvent(BaseModel):
@@ -244,3 +248,10 @@ class ServiceConfig(BaseModel):
     model_error: str | None
     demo_enabled: bool
     services: list[str]
+    auth_required: bool = False
+
+
+class Me(BaseModel):
+    name: str | None
+    role: str
+    authenticated: bool
