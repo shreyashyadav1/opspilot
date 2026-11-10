@@ -9,6 +9,12 @@
 groq:openai/gpt-oss-120b:
   input: 0.15
   output: 0.60
+# switchyard:gpt-oss-120b: priced as its first target in Switchyard's example config (Groq's
+# openai/gpt-oss-120b, same source and date as above). A call served by a fallback target can cost
+# differently; Switchyard's own cost_usd log field and metric are the source of truth for those.
+switchyard:gpt-oss-120b:
+  input: 0.15
+  output: 0.60
 fake:playbook:
   input: 0.0
   output: 0.0

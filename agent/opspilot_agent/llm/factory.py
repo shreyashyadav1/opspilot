@@ -2,6 +2,10 @@
 
 Real providers go through `langchain-openai` against any OpenAI-compatible endpoint. Keys are
 read from the environment (and `.env`); they are never logged or passed to tool servers.
+
+Requests to gateways we run ourselves (`switchyard`, `custom`) carry the W3C `traceparent` of the
+current span, so the gateway's spans join the investigation's trace. Hosted providers never get
+it: trace ids stay inside our own systems.
 """
 
 from __future__ import annotations
@@ -9,8 +13,10 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+import httpx
 from dotenv import load_dotenv
 from langchain_core.language_models import BaseChatModel
+from opentelemetry.propagate import inject
 from pydantic import SecretStr
 
 # Groq shut down llama-3.3-70b-versatile for free and developer tiers on 2026-08-16;
@@ -31,6 +37,9 @@ class ModelSpecError(ValueError):
 class Provider:
     base_url: str | None
     api_key_env: str | None
+    # Environment variable that overrides base_url (required when base_url is None).
+    base_url_env: str | None = None
+    propagate_trace: bool = False
 
 
 PROVIDERS: dict[str, Provider] = {
@@ -38,9 +47,36 @@ PROVIDERS: dict[str, Provider] = {
     "openai": Provider("https://api.openai.com/v1", "OPENAI_API_KEY"),
     "openrouter": Provider("https://openrouter.ai/api/v1", "OPENROUTER_API_KEY"),
     "ollama": Provider("http://localhost:11434/v1", None),
+    # The Switchyard LLM gateway: model names are the gateway's own (e.g. gpt-oss-120b), and it
+    # handles provider keys, retries, fallback, rate limits and budgets.
+    "switchyard": Provider(
+        "http://localhost:8080/v1",
+        "SWITCHYARD_API_KEY",
+        base_url_env="SWITCHYARD_URL",
+        propagate_trace=True,
+    ),
     # Any other OpenAI-compatible server: OPSPILOT_LLM_BASE_URL + OPSPILOT_LLM_API_KEY.
-    "custom": Provider(None, "OPSPILOT_LLM_API_KEY"),
+    "custom": Provider(
+        None, "OPSPILOT_LLM_API_KEY", base_url_env="OPSPILOT_LLM_BASE_URL", propagate_trace=True
+    ),
 }
+
+
+def _inject_trace_context(request: httpx.Request) -> None:
+    inject(request.headers)
+
+
+async def _ainject_trace_context(request: httpx.Request) -> None:
+    inject(request.headers)
+
+
+def _tracing_http_clients() -> dict[str, httpx.Client | httpx.AsyncClient]:
+    """httpx clients that add the current span's trace context to every request. The OpenAI
+    client still sets the timeout on each request, so only the hooks differ from its defaults."""
+    return {
+        "http_client": httpx.Client(event_hooks={"request": [_inject_trace_context]}),
+        "http_async_client": httpx.AsyncClient(event_hooks={"request": [_ainject_trace_context]}),
+    }
 
 
 def build_model(spec: str | None = None, *, temperature: float = 0.0) -> BaseChatModel:
@@ -60,9 +96,9 @@ def build_model(spec: str | None = None, *, temperature: float = 0.0) -> BaseCha
     if provider is None:
         raise ModelSpecError(f"unknown provider {provider_name!r}; use one of {sorted(PROVIDERS)}")
     load_dotenv()
-    base_url = provider.base_url or os.getenv("OPSPILOT_LLM_BASE_URL")
+    base_url = (provider.base_url_env and os.getenv(provider.base_url_env)) or provider.base_url
     if not base_url:
-        raise ModelSpecError("set OPSPILOT_LLM_BASE_URL for the custom provider")
+        raise ModelSpecError(f"set {provider.base_url_env} for the {provider_name} provider")
     api_key = "not-needed"
     if provider.api_key_env:
         api_key = os.getenv(provider.api_key_env, "")
@@ -81,4 +117,5 @@ def build_model(spec: str | None = None, *, temperature: float = 0.0) -> BaseCha
         max_tokens=DEFAULT_MAX_TOKENS,
         max_retries=6,
         timeout=90,
+        **(_tracing_http_clients() if provider.propagate_trace else {}),
     )
