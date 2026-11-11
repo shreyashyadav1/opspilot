@@ -25,6 +25,8 @@ _PASSTHROUGH_PREFIXES = (
     "OPSPILOT_SERVICE",
     "OPSPILOT_CONTAINER",
     "OPSPILOT_DOCKER",
+    "OPSPILOT_LOG_BACKEND",
+    "OPSPILOT_LOKI",
     "DOCKER_",
 )
 # The tool server exports its own spans, so it needs to know whether tracing is on and where to

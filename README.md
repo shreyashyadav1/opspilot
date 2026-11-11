@@ -259,7 +259,8 @@ the model, date, commit and number of repetitions.
   [Access control](#access-control)): only an approver key can approve or reject an action,
   and the reviewer on the record is the key's name. Without keys it runs open for the local
   demo and marks every decision as unauthenticated. In Docker the API mounts the Docker socket
-  to read container logs, which is fine for a local demo only.
+  to read container logs, which is fine for a local demo only; with `OPSPILOT_LOG_BACKEND=loki`
+  the MCP server reads logs from Loki instead and needs no access to the Docker daemon.
 - The model never writes PromQL, shell commands or URLs; every tool argument is an enum or a
   bounded value, and tool output is truncated before it reaches the model.
 - API keys come from `.env` and are not passed to the MCP server process.

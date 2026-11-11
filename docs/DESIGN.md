@@ -492,7 +492,11 @@ Rules and caveats:
   without a restart are left for a shared deployment.
 - In docker compose, the agent API mounts the Docker socket so that the MCP server can read
   container logs. That grants control of the Docker daemon, which is acceptable for a local
-  demo only; a cluster deployment reads logs from a log backend instead (M7).
+  demo only. Setting `OPSPILOT_LOG_BACKEND=loki` makes the MCP server read logs from Loki's
+  `query_range` API instead, so the process that runs the agent's tools needs no Docker access.
+  The LogQL selector is built only from a catalog service name and a label name validated at
+  startup, never from model text. The newest `OPSPILOT_LOKI_LIMIT` lines in the window are
+  kept. Shipping logs into Loki (a node agent in a cluster) is part of M7.
 
 ## 7. Milestones
 

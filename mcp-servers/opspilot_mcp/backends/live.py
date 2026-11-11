@@ -1,7 +1,8 @@
 """Live backend: the docker compose demo system.
 
 - metrics: Prometheus HTTP API (range queries)
-- logs: container stdout via the Docker CLI (services log JSON lines to stdout only)
+- logs: container stdout via the Docker CLI (services log JSON lines to stdout only), or a
+  Loki log backend, so the process that runs the agent's tools needs no Docker socket
 - health: each service's health endpoint
 - deploys and rollbacks: the control plane's deploy API (never its chaos API)
 """
@@ -10,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -23,6 +25,9 @@ from opspilot_mcp.catalog import CATALOG
 from opspilot_mcp.logsearch import parse_line
 from opspilot_mcp.metrics import METRICS
 from opspilot_mcp.models import BackendError, DeployEvent, HealthReport, LogEntry, Series
+
+LOG_BACKENDS = frozenset({"docker", "loki"})
+_LABEL_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
 
 def _parse_urls(raw: str) -> dict[str, str]:
@@ -43,6 +48,23 @@ class LiveSettings:
     container_prefix: str = "opspilot-"
     docker_bin: str = "docker"
     health_timeout_s: float = 3.0
+    log_backend: str = "docker"
+    loki_url: str = "http://localhost:3100"
+    # The stream label that names the service. The value is always a catalog service name, never
+    # model text, so the LogQL selector cannot be steered by the model.
+    loki_service_label: str = "service"
+    loki_tenant: str | None = None
+    loki_limit: int = 5000
+
+    def __post_init__(self) -> None:
+        if self.log_backend not in LOG_BACKENDS:
+            raise ValueError(
+                f"unknown log backend {self.log_backend!r}; expected one of {sorted(LOG_BACKENDS)}"
+            )
+        if not _LABEL_NAME.fullmatch(self.loki_service_label):
+            raise ValueError(f"invalid Loki label name {self.loki_service_label!r}")
+        if not 1 <= self.loki_limit <= 50_000:
+            raise ValueError("loki_limit must be between 1 and 50000")
 
     @classmethod
     def from_env(cls) -> LiveSettings:
@@ -54,6 +76,13 @@ class LiveSettings:
             service_urls=_parse_urls(urls) if urls else defaults.service_urls,
             container_prefix=os.getenv("OPSPILOT_CONTAINER_PREFIX", defaults.container_prefix),
             docker_bin=os.getenv("OPSPILOT_DOCKER_BIN", defaults.docker_bin),
+            log_backend=os.getenv("OPSPILOT_LOG_BACKEND", defaults.log_backend).strip().lower(),
+            loki_url=os.getenv("OPSPILOT_LOKI_URL", defaults.loki_url).rstrip("/"),
+            loki_service_label=os.getenv(
+                "OPSPILOT_LOKI_SERVICE_LABEL", defaults.loki_service_label
+            ),
+            loki_tenant=os.getenv("OPSPILOT_LOKI_TENANT") or None,
+            loki_limit=int(os.getenv("OPSPILOT_LOKI_LIMIT", str(defaults.loki_limit))),
         )
 
 
@@ -171,6 +200,57 @@ class LiveBackend:
         return result
 
     async def log_entries(self, service: str, since_minutes: int) -> list[LogEntry]:
+        if service not in CATALOG:
+            raise BackendError(f"unknown service {service!r}")
+        if self.settings.log_backend == "loki":
+            return await self._loki_log_entries(service, since_minutes)
+        return await self._docker_log_entries(service, since_minutes)
+
+    async def _loki_log_entries(self, service: str, since_minutes: int) -> list[LogEntry]:
+        """Read a service's log lines from Loki's query_range API.
+
+        Newest lines first with a limit, so a noisy window keeps the most recent records (the
+        ones closest to the alert); the result is then sorted oldest first like the Docker path.
+        """
+        end = datetime.now(UTC)
+        start = end - timedelta(minutes=since_minutes)
+        params = {
+            "query": f'{{{self.settings.loki_service_label}="{service}"}}',
+            "start": str(int(start.timestamp() * 1e9)),
+            "end": str(int(end.timestamp() * 1e9)),
+            "limit": str(self.settings.loki_limit),
+            "direction": "backward",
+        }
+        headers = {"X-Scope-OrgID": self.settings.loki_tenant} if self.settings.loki_tenant else {}
+        try:
+            response = await self._client.get(
+                f"{self.settings.loki_url}/loki/api/v1/query_range",
+                params=params,
+                headers=headers,
+                timeout=20,
+            )
+            response.raise_for_status()
+            payload = response.json()
+        except httpx.HTTPStatusError as exc:
+            raise BackendError(
+                f"could not read logs for {service}: Loki returned {exc.response.status_code}"
+            ) from exc
+        except (httpx.HTTPError, ValueError) as exc:
+            raise BackendError(f"could not read logs for {service}: {type(exc).__name__}") from exc
+        data = payload.get("data") if isinstance(payload, dict) else None
+        if payload.get("status") != "success" or not isinstance(data, dict):
+            raise BackendError(f"could not read logs for {service}: Loki query failed")
+        if data.get("resultType") != "streams":
+            raise BackendError(f"could not read logs for {service}: unexpected Loki result")
+        entries = [
+            entry
+            for stream in data.get("result", [])
+            for _, line in stream.get("values", [])
+            if (entry := parse_line(line, service))
+        ]
+        return sorted(entries, key=lambda e: e.timestamp)
+
+    async def _docker_log_entries(self, service: str, since_minutes: int) -> list[LogEntry]:
         container = self.settings.container_prefix + service
         try:
             process = await asyncio.create_subprocess_exec(
