@@ -14,10 +14,14 @@ def test_model_api_keys_never_reach_the_tool_server(monkeypatch):
     monkeypatch.setenv("GROQ_API_KEY", "not-a-real-key")
     monkeypatch.setenv("OPENAI_API_KEY", "not-a-real-key")
     monkeypatch.setenv("OPSPILOT_PROMETHEUS_URL", "http://prometheus.test:9090")
+    monkeypatch.setenv("OPSPILOT_LOG_BACKEND", "loki")
+    monkeypatch.setenv("OPSPILOT_LOKI_URL", "http://loki.test:3100")
     connection = stdio_connection("simulated")
     assert "GROQ_API_KEY" not in connection["env"]
     assert "OPENAI_API_KEY" not in connection["env"]
     assert connection["env"]["OPSPILOT_PROMETHEUS_URL"] == "http://prometheus.test:9090"
+    assert connection["env"]["OPSPILOT_LOG_BACKEND"] == "loki"
+    assert connection["env"]["OPSPILOT_LOKI_URL"] == "http://loki.test:3100"
     assert connection["args"][-2:] == ["--backend", "simulated"]
 
 
