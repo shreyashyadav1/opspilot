@@ -11,8 +11,9 @@ import { Button, uiStyles } from "./ui";
 import styles from "./AppHeader.module.css";
 
 /**
- * Who is signed in, when the agent API requires keys. Shows a key field when the API answers
- * 401, the key's name and role once one is saved, and nothing when the API runs open.
+ * Who is signed in, when the agent API uses keys. Shows a key field when the API answers 401 or
+ * lets a caller without a key in with a lower role, the key's name and role once one is saved,
+ * and nothing when the API runs open.
  */
 export function AccessKey() {
   const ids = useId();
@@ -59,7 +60,10 @@ export function AccessKey() {
       </div>
     );
   }
-  if (!(error instanceof ApiError) || error.status !== 401) return null;
+  const keyWanted =
+    (error instanceof ApiError && error.status === 401) ||
+    (me?.authenticated === false && me.keys_enabled === true);
+  if (!keyWanted) return null;
   return (
     <form className={styles.access} onSubmit={(event) => void signIn(event)}>
       <label htmlFor={`${ids}-key`} className={styles.accessLabel}>

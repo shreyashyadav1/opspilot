@@ -170,4 +170,15 @@ describe("DecisionPanel with API keys", () => {
     expect(screen.getByRole("button", { name: "Approve rollback" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Reject" })).toBeDisabled();
   });
+
+  it("lets a visitor without a key watch but not decide when the API allows viewers", async () => {
+    mockApi({
+      "/api/me": [200, { name: null, role: "viewer", authenticated: false, keys_enabled: true }],
+    });
+    renderWithSWR(<DecisionPanel investigation={investigation()} onDecided={() => {}} />);
+    expect(await screen.findByText(/Without an API key you can follow/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Approve rollback" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Reject" })).toBeDisabled();
+    expect(screen.queryByText(/Recorded as “operator”/)).not.toBeInTheDocument();
+  });
 });

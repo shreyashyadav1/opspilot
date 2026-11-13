@@ -18,6 +18,8 @@
   runs failed instead.
 - OPSPILOT_API_KEYS: `name:role:sha256` entries that turn on API-key authentication with
   viewer, operator and approver roles (see `opspilot_api.auth`). Unset, the API runs open.
+- OPSPILOT_ANONYMOUS_ROLE: what callers without a key may do (`none`, `viewer`, `operator`,
+  `approver`). Defaults to `approver` without keys and `none` with them.
 """
 
 from __future__ import annotations
@@ -29,7 +31,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from opspilot_agent.llm import DEFAULT_MODEL
-from opspilot_api.auth import ApiKey, parse_keys
+from opspilot_api.auth import ApiKey, Role, parse_anonymous_role, parse_keys
 
 BASELINE_MODEL = "fake:playbook"
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -57,6 +59,13 @@ class ApiSettings:
     max_turns: int = 12
     max_resumes: int = 1
     api_keys: tuple[ApiKey, ...] = ()
+    # Raw OPSPILOT_ANONYMOUS_ROLE; unset picks the default for whether keys are configured.
+    anonymous_role: str | None = None
+
+    @property
+    def anonymous_access(self) -> Role | None:
+        """The role of a caller without a key, or None if such callers are refused."""
+        return parse_anonymous_role(self.anonymous_role, self.api_keys)
 
     @property
     def records_db(self) -> Path:
@@ -79,7 +88,7 @@ class ApiSettings:
         simulation = os.getenv("OPSPILOT_SIMULATION")
         results = os.getenv("OPSPILOT_RESULTS_DIR")
         pricing = os.getenv("OPSPILOT_PRICING_FILE")
-        return cls(
+        settings = cls(
             data_dir=Path(os.getenv("OPSPILOT_API_DATA_DIR", str(defaults.data_dir))),
             model=default_model(),
             backend=os.getenv("OPSPILOT_BACKEND", defaults.backend),
@@ -91,4 +100,7 @@ class ApiSettings:
             max_turns=int(os.getenv("OPSPILOT_MAX_TURNS", str(defaults.max_turns))),
             max_resumes=int(os.getenv("OPSPILOT_MAX_RESUMES", str(defaults.max_resumes))),
             api_keys=parse_keys(os.getenv("OPSPILOT_API_KEYS")),
+            anonymous_role=os.getenv("OPSPILOT_ANONYMOUS_ROLE") or None,
         )
+        settings.anonymous_access  # noqa: B018 - a bad combination fails here, at startup
+        return settings

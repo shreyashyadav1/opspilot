@@ -8,9 +8,12 @@ SHA-256 digest of the key (the key itself is never stored). `python -m opspilot_
 - operator: also start investigations and inject or clear demo faults
 - approver: also approve or reject the actions the agent proposes
 
-Clients send `Authorization: Bearer <key>`. With no keys configured the API runs open, as in
-the local demo: every caller may do everything, and decisions are recorded as unauthenticated
-so the dashboard and the trace can say so.
+Clients send `Authorization: Bearer <key>`. OPSPILOT_ANONYMOUS_ROLE sets what a caller without
+a key may do: `none`, `viewer`, `operator` or `approver`. It defaults to `approver` with no keys
+configured (the local demo, where every caller may do everything) and to `none` with keys
+(every route needs one). `viewer` with keys suits a public demo that anyone may watch but only
+named approvers may act on. Decisions made without a key are recorded as unauthenticated so the
+dashboard and the trace can say so.
 """
 
 from __future__ import annotations
@@ -48,6 +51,34 @@ class Principal:
 
 
 ANONYMOUS = Principal(name=None, role="approver", authenticated=False)
+NO_ANONYMOUS = "none"
+
+
+def parse_anonymous_role(raw: str | None, keys: tuple[ApiKey, ...]) -> Role | None:
+    """Parse OPSPILOT_ANONYMOUS_ROLE. None means callers without a key are refused.
+
+    Two combinations are startup errors: `none` without keys (nobody could use the API) and
+    `approver` with keys (anyone could approve without one, which makes the keys pointless).
+    """
+    value = (raw or "").strip().lower()
+    if not value:
+        return None if keys else "approver"
+    if value == NO_ANONYMOUS:
+        if not keys:
+            raise ValueError(
+                "OPSPILOT_ANONYMOUS_ROLE=none needs OPSPILOT_API_KEYS; nobody could use the API"
+            )
+        return None
+    if value not in ROLES:
+        raise ValueError(
+            f"OPSPILOT_ANONYMOUS_ROLE must be one of {NO_ANONYMOUS}, {', '.join(ROLES)}"
+        )
+    if value == "approver" and keys:
+        raise ValueError(
+            "OPSPILOT_ANONYMOUS_ROLE=approver with OPSPILOT_API_KEYS would let anyone approve "
+            "without a key; use operator or lower"
+        )
+    return value  # type: ignore[return-value]
 
 
 @dataclass(frozen=True)
@@ -91,8 +122,13 @@ def parse_keys(raw: str | None) -> tuple[ApiKey, ...]:
 
 
 class Authenticator:
-    def __init__(self, keys: tuple[ApiKey, ...]) -> None:
+    def __init__(self, keys: tuple[ApiKey, ...], anonymous_role: str | None = None) -> None:
+        """`anonymous_role` is the raw OPSPILOT_ANONYMOUS_ROLE; see `parse_anonymous_role`."""
         self._keys = keys
+        role = parse_anonymous_role(anonymous_role, keys)
+        self._anonymous = (
+            None if role is None else Principal(name=None, role=role, authenticated=False)
+        )
 
     @property
     def enabled(self) -> bool:
@@ -100,7 +136,10 @@ class Authenticator:
 
     def identify(self, authorization: str | None) -> Principal:
         if not self.enabled:
-            return ANONYMOUS
+            assert self._anonymous is not None
+            return self._anonymous
+        if not (authorization or "").strip() and self._anonymous is not None:
+            return self._anonymous
         scheme, _, token = (authorization or "").partition(" ")
         token = token.strip()
         if scheme.lower() != "bearer" or not token:
@@ -118,7 +157,7 @@ class Authenticator:
     def require(self, authorization: str | None, role: Role) -> Principal:
         principal = self.identify(authorization)
         if not principal.allows(role):
-            raise ApiError(
-                403, f"{principal.name} has the {principal.role} role; this needs {role}."
-            )
+            who = principal.name if principal.authenticated else "Without an API key you"
+            verb = "has" if principal.authenticated else "have"
+            raise ApiError(403, f"{who} {verb} the {principal.role} role; this needs {role}.")
         return principal

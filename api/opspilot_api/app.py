@@ -145,7 +145,7 @@ def create_app(
     )
 
     # Set here rather than in the lifespan so a bad key list fails before anything starts.
-    app.state.authenticator = Authenticator(settings.api_keys)
+    app.state.authenticator = Authenticator(settings.api_keys, settings.anonymous_role)
 
     @app.exception_handler(ApiError)
     async def api_error(_: Request, exc: ApiError) -> JSONResponse:
@@ -170,8 +170,13 @@ def create_app(
         )
 
     @app.get("/me")
-    async def me(principal: Viewer) -> Me:
-        return Me(name=principal.name, role=principal.role, authenticated=principal.authenticated)
+    async def me(request: Request, principal: Viewer) -> Me:
+        return Me(
+            name=principal.name,
+            role=principal.role,
+            authenticated=principal.authenticated,
+            keys_enabled=request.app.state.authenticator.enabled,
+        )
 
     # -- investigations --------------------------------------------------------------------
 

@@ -154,6 +154,11 @@ OPSPILOT_API_KEYS=alice:approver:<digest>,olly:operator:<digest>
 Clients send `Authorization: Bearer <key>`; `/health` stays open. In the dashboard, paste the
 key into the field in the header. The dashboard checks it against the API, keeps it in an
 httpOnly cookie and sends it on as a bearer header, so it also covers the live event stream.
+
+With keys set, a caller without one is refused by default. `OPSPILOT_ANONYMOUS_ROLE=viewer`
+(or `operator`) lets such callers in with that role instead, for a shared demo that anyone may
+watch while only named approvers can let the agent act. `approver` is refused there at startup,
+since it would make the keys pointless. A wrong key is still a 401.
 The decision panel then names the reviewer from the key and disables Approve and Reject for
 keys without the approver role.
 

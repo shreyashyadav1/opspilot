@@ -58,10 +58,11 @@ export function DecisionPanel({
 }) {
   const ids = useId();
   const [reviewer, setReviewer] = useStoredValue("opspilot.reviewer", "operator");
-  // With API keys on, the key names the reviewer and only approvers may decide.
+  // With API keys on, the key names the reviewer and only approvers may decide. A caller without
+  // a key has the API's anonymous role, which is approver only when the API runs without keys.
   const { data: me } = useMe();
   const signedIn = me?.authenticated === true;
-  const mayDecide = !signedIn || me.role === "approver";
+  const mayDecide = (me?.role ?? "approver") === "approver";
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState<"approve" | "reject" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -203,14 +204,16 @@ export function DecisionPanel({
                 onChange={(event) => setComment(event.target.value)}
               />
             </div>
-            {anonymous ? (
+            {anonymous && mayDecide ? (
               <p id={`${ids}-reviewer-hint`} className={`${uiStyles.hint} ${styles.wide}`}>
                 Recorded as “operator” unless you add your name.
               </p>
             ) : null}
             {!mayDecide ? (
               <p id={`${ids}-role-hint`} className={`${uiStyles.hint} ${styles.wide}`}>
-                Your key has the {me?.role} role. Approving or rejecting needs an approver key.
+                {signedIn
+                  ? `Your key has the ${me.role} role. Approving or rejecting needs an approver key.`
+                  : "Without an API key you can follow this investigation but not decide it. Approving or rejecting needs an approver key."}
               </p>
             ) : null}
           </div>

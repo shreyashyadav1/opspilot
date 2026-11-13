@@ -258,3 +258,5 @@ class Me(BaseModel):
     name: str | None
     role: str
     authenticated: bool
+    # True when the API has keys, so a caller without one can sign in for a stronger role.
+    keys_enabled: bool = False

@@ -191,6 +191,8 @@ export interface Me {
   name: string | null;
   role: Role;
   authenticated: boolean;
+  /** The API has keys, so a caller without one can sign in for a stronger role. */
+  keys_enabled?: boolean;
 }
 
 export interface ParamSchema {
