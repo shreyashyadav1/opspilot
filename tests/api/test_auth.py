@@ -4,7 +4,7 @@ from dataclasses import replace
 
 import pytest
 
-from opspilot_api.auth import Authenticator, digest, parse_keys
+from opspilot_api.auth import Authenticator, digest, parse_anonymous_role, parse_keys
 from opspilot_api.errors import ApiError
 from opspilot_api.keys import main as keys_main
 from opspilot_api.settings import ApiSettings
@@ -86,6 +86,82 @@ def test_without_keys_everyone_is_an_unauthenticated_approver():
     assert (principal.name, principal.authenticated) == (None, False)
 
 
+@pytest.mark.parametrize(
+    ("raw", "with_keys", "expected"),
+    [
+        (None, False, "approver"),
+        (None, True, None),
+        ("", True, None),
+        ("none", True, None),
+        (" Viewer ", True, "viewer"),
+        ("operator", True, "operator"),
+        ("viewer", False, "viewer"),
+        ("approver", False, "approver"),
+    ],
+)
+def test_anonymous_role_defaults_to_open_without_keys_and_closed_with_them(
+    raw, with_keys, expected
+):
+    keys = parse_keys(ENTRIES) if with_keys else ()
+    assert parse_anonymous_role(raw, keys) == expected
+
+
+@pytest.mark.parametrize(
+    ("raw", "with_keys", "message"),
+    [
+        ("none", False, "needs OPSPILOT_API_KEYS"),
+        ("approver", True, "anyone approve without a key"),
+        ("admin", True, "must be one of none, viewer"),
+    ],
+)
+def test_an_unsafe_or_unusable_anonymous_role_is_a_startup_error(raw, with_keys, message):
+    keys = parse_keys(ENTRIES) if with_keys else ()
+    with pytest.raises(ValueError, match=message):
+        parse_anonymous_role(raw, keys)
+
+
+def test_settings_check_the_anonymous_role_at_startup(monkeypatch):
+    monkeypatch.setattr("opspilot_api.settings.load_dotenv", lambda: None)
+    monkeypatch.setenv("OPSPILOT_API_KEYS", ENTRIES)
+    monkeypatch.setenv("OPSPILOT_ANONYMOUS_ROLE", "viewer")
+    assert ApiSettings.from_env().anonymous_access == "viewer"
+    monkeypatch.setenv("OPSPILOT_ANONYMOUS_ROLE", "approver")
+    with pytest.raises(ValueError, match="anyone approve"):
+        ApiSettings.from_env()
+    monkeypatch.delenv("OPSPILOT_API_KEYS")
+    assert ApiSettings.from_env().anonymous_access == "approver"
+
+
+def test_a_keyless_caller_gets_the_anonymous_role_but_a_bad_key_is_still_refused():
+    auth = Authenticator(parse_keys(ENTRIES), "viewer")
+    for header in (None, "", "  "):
+        principal = auth.require(header, "viewer")
+        assert (principal.name, principal.role, principal.authenticated) == (
+            None,
+            "viewer",
+            False,
+        )
+    for header in ("Bearer wrong", "Basic ops_olly-key", "Bearer "):
+        with pytest.raises(ApiError) as refused:
+            auth.require(header, "viewer")
+        assert refused.value.status_code == 401
+    with pytest.raises(ApiError) as forbidden:
+        auth.require(None, "operator")
+    assert forbidden.value.status_code == 403
+    assert forbidden.value.detail == (
+        "Without an API key you have the viewer role; this needs operator."
+    )
+    assert auth.require("Bearer ops_alice-key", "approver").name == "alice"
+
+
+def test_without_keys_the_anonymous_role_can_be_lowered():
+    auth = Authenticator((), "operator")
+    assert auth.require(None, "operator").authenticated is False
+    with pytest.raises(ApiError) as forbidden:
+        auth.require(None, "approver")
+    assert forbidden.value.status_code == 403
+
+
 def test_key_command_prints_a_key_and_its_entry(capsys):
     assert keys_main(["new", "alice", "approver"]) == 0
     key_line, entry_line = capsys.readouterr().out.splitlines()
@@ -112,7 +188,12 @@ async def test_every_route_but_health_needs_a_key(secured, tools):
         config = (await client.get("/config", headers=bearer("vic"))).json()
         assert config["auth_required"] is True
         me = (await client.get("/me", headers=bearer("olly"))).json()
-        assert me == {"name": "olly", "role": "operator", "authenticated": True}
+        assert me == {
+            "name": "olly",
+            "role": "operator",
+            "authenticated": True,
+            "keys_enabled": True,
+        }
 
 
 async def test_viewers_read_and_operators_start_investigations(secured, tools):
@@ -168,7 +249,12 @@ async def test_without_keys_the_api_stays_open_and_says_so(settings, tools):
     async with serve(build_app(settings, tools, "rollback_deploy")) as client:
         assert (await client.get("/config")).json()["auth_required"] is False
         me = (await client.get("/me")).json()
-        assert me == {"name": None, "role": "approver", "authenticated": False}
+        assert me == {
+            "name": None,
+            "role": "approver",
+            "authenticated": False,
+            "keys_enabled": False,
+        }
         investigation_id = (await client.post("/investigations", json=ALERT)).json()["id"]
         await wait_for(client, investigation_id, {"awaiting_approval"})
         rejected = await client.post(
@@ -176,6 +262,32 @@ async def test_without_keys_the_api_stays_open_and_says_so(settings, tools):
         )
         approval = rejected.json()["approval"]
     assert (approval["reviewer"], approval["authenticated"]) == ("operator", False)
+
+
+async def test_a_public_demo_is_watchable_without_a_key_but_only_approvers_act(secured, tools):
+    public = replace(secured, anonymous_role="viewer")
+    async with serve(build_app(public, tools, "rollback_deploy")) as client:
+        me = (await client.get("/me")).json()
+        assert me == {"name": None, "role": "viewer", "authenticated": False, "keys_enabled": True}
+        assert (await client.get("/investigations")).status_code == 200
+        refused = await client.post("/investigations", json=ALERT)
+        assert refused.status_code == 403
+        assert refused.json()["detail"].startswith("Without an API key you have the viewer role")
+        assert (
+            await client.get("/config", headers={"Authorization": "Bearer nope"})
+        ).status_code == 401
+
+        created = await client.post("/investigations", json=ALERT, headers=bearer("olly"))
+        investigation_id = created.json()["id"]
+        await wait_for(client, investigation_id, {"awaiting_approval"})
+        url = f"/investigations/{investigation_id}/decision"
+        assert (await client.post(url, json={"decision": "approve"})).status_code == 403
+        assert tools.rollbacks == []
+        approved = await client.post(url, json={"decision": "approve"}, headers=bearer("alice"))
+        assert approved.status_code == 200
+        done = await wait_for(client, investigation_id, TERMINAL)
+    assert (done["approval"]["reviewer"], done["approval"]["authenticated"]) == ("alice", True)
+    assert len(tools.rollbacks) == 1
 
 
 async def test_demo_faults_need_an_operator_and_auth_comes_first(secured, tools):

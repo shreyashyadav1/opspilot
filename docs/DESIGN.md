@@ -343,6 +343,11 @@ The API runs the same graph as the CLI and the benchmark, for people instead of 
   reviewer of a decision is the key's name (a different `reviewer` in the body is refused), and
   the record, the `decision` trace event and the `approval_wait` span carry
   `authenticated: true`. Without keys the API is open and decisions say `authenticated: false`.
+  `OPSPILOT_ANONYMOUS_ROLE` sets the role of a caller without a key: it defaults to approver
+  without keys and to none (401) with them, and with keys it may be lowered to viewer or
+  operator so a public demo can be watched without a key. Anonymous approval with keys on, and
+  `none` without keys, are startup errors. A key that is sent but unknown is always a 401,
+  never a fallback to the anonymous role.
 - **Boundary.** The demo endpoints belong to the harness side. The MCP server still never sees
   the chaos API, and `OPSPILOT_CHAOS_URL` is not passed to it.
 

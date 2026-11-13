@@ -41,6 +41,14 @@ describe("AccessKey", () => {
     expect(fetchMock.mock.calls.map(([url]) => String(url))).toContain("/session");
   });
 
+  it("offers a key field to a visitor the API lets in without one", async () => {
+    mockApi({
+      "/api/me": [200, { name: null, role: "viewer", authenticated: false, keys_enabled: true }],
+    });
+    renderWithSWR(<AccessKey />);
+    expect(await screen.findByLabelText("API key")).toHaveAttribute("type", "password");
+  });
+
   it("explains a key the API does not know", async () => {
     const user = userEvent.setup();
     mockApi({
