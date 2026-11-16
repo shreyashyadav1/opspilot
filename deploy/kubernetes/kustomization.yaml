@@ -1,0 +1,51 @@
+# OpsPilot on Kubernetes: the demo system, Prometheus, Loki (with Grafana Alloy shipping pod logs
+# into it), the agent API and the dashboard, in one namespace. See README.md for a kind walkthrough.
+#
+# Render:   kubectl kustomize deploy/kubernetes
+# Validate: make k8s-check   (kubeconform, strict, against the Kubernetes 1.33 schemas)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: opspilot
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: opspilot
+    includeSelectors: false
+
+resources:
+  - namespace.yaml
+  - postgres.yaml
+  - orders.yaml
+  - payments.yaml
+  - storefront.yaml
+  - control-plane.yaml
+  - loadgen.yaml
+  - prometheus.yaml
+  - loki.yaml
+  - alloy.yaml
+  - agent-api.yaml
+  - dashboard.yaml
+
+configMapGenerator:
+  - name: prometheus-config
+    files:
+      - prometheus.yml=config/prometheus.yml
+  - name: loki-config
+    files:
+      - loki.yaml=config/loki.yaml
+  - name: alloy-config
+    files:
+      - config.alloy=config/config.alloy
+
+# Images are built locally (make up builds the same tags) and loaded into the cluster with
+# `kind load docker-image`. Point these at a registry for any other cluster.
+images:
+  - name: opspilot-python-services
+    newTag: dev
+  - name: opspilot-orders
+    newTag: dev
+  - name: opspilot-agent-api
+    newTag: dev
+  - name: opspilot-dashboard
+    newTag: dev

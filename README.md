@@ -181,6 +181,16 @@ resumed after a decision, the resumed run's spans in the same trace.
 With tracing off (the default), every service still creates spans locally but none are
 exported, so nothing here needs a trace backend running: unit tests and CI are unaffected.
 
+## Kubernetes
+
+[deploy/kubernetes](deploy/kubernetes/README.md) runs the same stack on a cluster (kind for a
+laptop): the demo system, Prometheus, the agent API and the dashboard, with Loki in place of the
+Docker socket. Grafana Alloy reads the services' pod logs through the Kubernetes API and ships
+them to Loki, and the MCP server queries Loki (`OPSPILOT_LOG_BACKEND=loki`). Every pod runs as
+non-root with a read-only root filesystem and memory limits. `make k8s-check` renders the
+manifests and validates them with kubeconform, and `tests/deploy` checks that they agree with the
+compose stack and with what the agent expects.
+
 ## Cost per incident
 
 Token usage is recorded per investigation and priced from [`evals/pricing.yaml`](evals/pricing.yaml)
@@ -276,7 +286,9 @@ the model, date, commit and number of repetitions.
 - [x] M6 Agent observability: an OpenTelemetry trace per investigation (model and tool calls,
   the approval wait), propagated into the demo system, a Jaeger backend in docker compose, and
   cost per incident in the API, the dashboard and the benchmark
-- [ ] M7 Kubernetes (kind + Helm), Loki log backend, cloud deployment
+- [ ] M7 Kubernetes and cloud: Kustomize manifests for the whole stack with Loki and Grafana
+  Alloy for logs are done ([deploy/kubernetes](deploy/kubernetes/README.md)); a kind run and a
+  cloud deployment are next
 
 See the milestone details in [docs/DESIGN.md](docs/DESIGN.md#7-milestones).
 
@@ -289,6 +301,7 @@ ui/                        dashboard (Next.js): pages, components, Vitest and Pl
 mcp-servers/opspilot_mcp/  MCP server, metric catalog, log search, live and simulated backends
 evals/                     scenarios, pricing, runner, scorer, reports
 demo-system/               docker compose, Python services, Spring Boot orders, Prometheus
+deploy/kubernetes/         Kustomize manifests for a cluster (Loki and Alloy for logs)
 observability/             shared OpenTelemetry setup used by the agent, the API and the MCP server
 tests/                     unit tests; tests/integration runs only when the stack is up
 docs/DESIGN.md             design and evaluation methodology
