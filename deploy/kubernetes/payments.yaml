@@ -31,7 +31,9 @@ spec:
           command: ["uvicorn", "opsdemo.payments.app:app", "--host", "0.0.0.0", "--port", "8080", "--no-access-log", "--timeout-graceful-shutdown", "5"]
           env:
             - name: OPSPILOT_TRACING_ENABLED
-              value: "false"
+              value: "true"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://jaeger:4318
           ports:
             - name: http
               containerPort: 8080

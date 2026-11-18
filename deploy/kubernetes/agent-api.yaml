@@ -63,7 +63,9 @@ spec:
             - name: OPSPILOT_PRICING_FILE
               value: /app/evals/pricing.yaml
             - name: OPSPILOT_TRACING_ENABLED
-              value: "false"
+              value: "true"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://jaeger:4318
             - name: OPSPILOT_BACKEND
               value: live
             - name: OPSPILOT_CHAOS_URL

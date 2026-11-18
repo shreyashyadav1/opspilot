@@ -15,7 +15,7 @@ from urllib.parse import urlparse
 import pytest
 import yaml
 
-from opspilot_agent.mcp_client import _PASSTHROUGH_PREFIXES
+from opspilot_agent.mcp_client import _PASSTHROUGH_NAMES, _PASSTHROUGH_PREFIXES
 from opspilot_mcp.backends.live import LiveSettings
 from opspilot_mcp.catalog import CATALOG
 
@@ -114,6 +114,55 @@ def test_prometheus_scrapes_the_same_jobs_as_the_compose_stack() -> None:
         assert job["job_name"] in CATALOG
         for target in job["static_configs"][0]["targets"]:
             assert target.split(":")[0] in SERVICES
+
+
+def _compose_traced_services() -> set[str]:
+    """Compose services that merge the shared tracing environment (`<<: *tracing-env`)."""
+    text = (ROOT / "demo-system" / "docker-compose.yml").read_text()
+    traced: set[str] = set()
+    service = None
+    for line in text.splitlines():
+        if match := re.fullmatch(r"  ([a-z][a-z0-9-]*):", line):
+            service = match[1]
+        elif line.strip() == "<<: *tracing-env" and service:
+            traced.add(service)
+    return traced
+
+
+def test_the_same_workloads_as_in_compose_export_traces_to_jaeger() -> None:
+    traced = {
+        name for name, w in WORKLOADS.items() if _env(w).get("OPSPILOT_TRACING_ENABLED") == "true"
+    }
+    assert traced == _compose_traced_services()
+    otlp_ports = {
+        p["port"] for p in SERVICES["jaeger"]["spec"]["ports"] if p["name"] == "otlp-http"
+    }
+    for name in traced:
+        endpoint = urlparse(_env(WORKLOADS[name])["OTEL_EXPORTER_OTLP_ENDPOINT"])
+        assert (endpoint.scheme, endpoint.hostname, endpoint.path) == ("http", "jaeger", ""), name
+        assert endpoint.port in otlp_ports, name
+    # Workloads outside the traced set must not half-configure tracing.
+    for name, workload in WORKLOADS.items():
+        if name not in traced:
+            assert "OTEL_EXPORTER_OTLP_ENDPOINT" not in _env(workload), name
+
+
+def test_the_mcp_server_inherits_the_agent_tracing_settings() -> None:
+    env = _env(WORKLOADS["agent-api"])
+    # The tool server is a subprocess; it exports its own spans only if both names reach it.
+    for key in ("OPSPILOT_TRACING_ENABLED", "OTEL_EXPORTER_OTLP_ENDPOINT"):
+        assert key in env
+        assert key in _PASSTHROUGH_NAMES or key.startswith(_PASSTHROUGH_PREFIXES)
+
+
+def test_jaeger_memory_storage_is_bounded_below_its_limit() -> None:
+    (container,) = _containers(WORKLOADS["jaeger"])
+    env = {e["name"]: e["value"] for e in container["env"]}
+    assert env["SPAN_STORAGE_TYPE"] == "memory"
+    assert int(env["MEMORY_MAX_TRACES"]) > 0
+    go_limit = re.fullmatch(r"(\d+)MiB", env["GOMEMLIMIT"])
+    assert go_limit, env["GOMEMLIMIT"]
+    assert int(go_limit[1]) < _memory_mi(container["resources"]["limits"]["memory"])
 
 
 @pytest.mark.parametrize("name", sorted(FAULT_TARGETS))

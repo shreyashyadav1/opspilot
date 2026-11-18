@@ -31,7 +31,9 @@ spec:
           imagePullPolicy: IfNotPresent
           env:
             - name: OPSPILOT_TRACING_ENABLED
-              value: "false"
+              value: "true"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://jaeger:4318
             - name: DB_URL
               value: jdbc:postgresql://postgres:5432/orders
             - name: DB_USER

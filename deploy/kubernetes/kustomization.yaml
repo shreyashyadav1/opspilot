@@ -1,5 +1,6 @@
 # OpsPilot on Kubernetes: the demo system, Prometheus, Loki (with Grafana Alloy shipping pod logs
-# into it), the agent API and the dashboard, in one namespace. See README.md for a kind walkthrough.
+# into it), Jaeger for traces, the agent API and the dashboard, in one namespace. See README.md
+# for a kind walkthrough.
 #
 # Render:   kubectl kustomize deploy/kubernetes
 # Validate: make k8s-check   (kubeconform, strict, against the Kubernetes 1.33 schemas)
@@ -24,6 +25,7 @@ resources:
   - prometheus.yaml
   - loki.yaml
   - alloy.yaml
+  - jaeger.yaml
   - agent-api.yaml
   - dashboard.yaml
 

@@ -12,6 +12,7 @@ Kustomize manifests for the whole stack in one namespace, `opspilot`:
 | prometheus | Deployment + Service | same scrape jobs as the compose stack |
 | loki | Deployment + Service | single binary, filesystem storage, 24 h retention |
 | alloy | Deployment + RBAC | ships the services' pod logs to Loki |
+| jaeger | Deployment + Service | all-in-one, in-memory storage capped at 5,000 traces |
 | agent-api | Deployment + Service + claim | SQLite data on a 1 GiB claim |
 | dashboard | Deployment + Service | Next.js, proxies to the agent API |
 
@@ -29,8 +30,12 @@ Kustomize manifests for the whole stack in one namespace, `opspilot`:
 - **One replica per demo service.** Fault state and the deploy registry live in the process.
 - **Hardened pods.** Every container runs as non-root with a read-only root filesystem, no
   capabilities, no privilege escalation, the runtime's default seccomp profile, and a memory
-  limit. The limits add up to 2.6 GiB, the same budget as the compose stack.
-- **Tracing is off** (`OPSPILOT_TRACING_ENABLED=false`); there is no Jaeger here yet.
+  limit. The limits add up to 2.75 GiB, within the compose stack's budget.
+- **Tracing is on.** Compose starts Jaeger only with the `tracing` or `dashboard` profile and
+  leaves `OPSPILOT_TRACING_ENABLED` off by default; here Jaeger is always part of the stack, so
+  the demo services, the agent API and the MCP server it starts export spans to
+  `http://jaeger:4318`. Jaeger keeps traces in memory (at most 5,000, oldest evicted first) and
+  loses them on a restart.
 
 ## Run it on kind
 
@@ -51,9 +56,10 @@ kubectl -n opspilot create secret generic opspilot-agent --from-env-file=.env
 kubectl apply -k deploy/kubernetes
 kubectl -n opspilot rollout status deploy/agent-api
 kubectl -n opspilot port-forward svc/dashboard 8100:8080
+kubectl -n opspilot port-forward svc/jaeger 8166:16686   # in a second terminal
 ```
 
-Then open http://localhost:8100. Without `OPSPILOT_API_KEYS` in the `opspilot-agent` Secret,
+Then open http://localhost:8100 (dashboard) and http://localhost:8166 (traces). Without `OPSPILOT_API_KEYS` in the `opspilot-agent` Secret,
 anyone who can reach the dashboard can approve a rollback; keep the Services cluster-internal
 (the default here) or set keys before exposing it.
 
