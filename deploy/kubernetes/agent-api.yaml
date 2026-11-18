@@ -1,0 +1,138 @@
+# Agent API. Every investigation starts the MCP tool server as a subprocess, which reads metrics
+# from Prometheus, logs from Loki (no Docker socket) and deploys from the control plane.
+# Investigations and LangGraph checkpoints are SQLite files on the agent-api-data claim, so
+# pending approvals survive a pod restart; SQLite also means one replica.
+#
+# Model keys and API keys come from the optional opspilot-agent Secret (GROQ_API_KEY,
+# OPSPILOT_MODEL, OPSPILOT_API_KEYS, ...). Without it the agent runs the rule-based playbook.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: agent-api-data
+  labels:
+    app.kubernetes.io/name: agent-api
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-api
+  labels:
+    app.kubernetes.io/name: agent-api
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agent-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: agent-api
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: agent-api
+          image: opspilot-agent-api
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef:
+                name: opspilot-agent
+                optional: true
+          env:
+            - name: OPSPILOT_API_HOST
+              value: 0.0.0.0
+            - name: OPSPILOT_API_PORT
+              value: "8080"
+            - name: OPSPILOT_API_DATA_DIR
+              value: /data
+            - name: OPSPILOT_RESULTS_DIR
+              value: /app/evals/results
+            - name: OPSPILOT_PRICING_FILE
+              value: /app/evals/pricing.yaml
+            - name: OPSPILOT_TRACING_ENABLED
+              value: "true"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://jaeger:4318
+            - name: OPSPILOT_BACKEND
+              value: live
+            - name: OPSPILOT_CHAOS_URL
+              value: http://control-plane:8080
+            - name: OPSPILOT_PROMETHEUS_URL
+              value: http://prometheus:9090
+            - name: OPSPILOT_CONTROL_PLANE_URL
+              value: http://control-plane:8080
+            - name: OPSPILOT_SERVICE_URLS
+              value: storefront=http://storefront:8080,orders=http://orders:8080,payments=http://payments:8080
+            - name: OPSPILOT_LOG_BACKEND
+              value: loki
+            - name: OPSPILOT_LOKI_URL
+              value: http://loki:3100
+            - name: OPSPILOT_LOKI_SERVICE_LABEL
+              value: service
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 384Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: agent-api-data
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agent-api
+  labels:
+    app.kubernetes.io/name: agent-api
+spec:
+  selector:
+    app.kubernetes.io/name: agent-api
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

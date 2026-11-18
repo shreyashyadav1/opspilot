@@ -538,6 +538,8 @@ Rules and caveats:
   - [x] Cost per incident: token usage and an estimated cost (`evals/pricing.yaml`) in the
         agent API response, the dashboard's investigation page and the benchmark output
 - [ ] **M7: Kubernetes and cloud**
-  - [ ] kind cluster with Helm charts for the demo system, the MCP server and the agent API
-  - [ ] Loki log backend for the MCP server
+  - [x] Kubernetes manifests (Kustomize) for the demo system, Prometheus, the agent API and the
+    dashboard, validated in CI (`deploy/kubernetes`)
+  - [ ] Run them on a kind cluster
+  - [x] Loki log backend for the MCP server, with Grafana Alloy shipping pod logs into Loki
   - [ ] Cloud deployment (for example AWS EKS or ECS) with CI/CD

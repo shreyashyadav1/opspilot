@@ -13,7 +13,7 @@ MODEL ?= groq:openai/gpt-oss-120b
 
 .DEFAULT_GOAL := help
 .PHONY: help install up up-tracing down ps logs test lint format eval-fake eval eval-baseline \
-	lock lock-runtime clean dashboard-up api-dev api-test ui-install ui-dev ui-test ui-e2e
+	lock lock-runtime clean k8s-check dashboard-up api-dev api-test ui-install ui-dev ui-test ui-e2e
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-14s %s\n", $$1, $$2}'
@@ -104,6 +104,10 @@ lock-runtime: ## Re-pin requirements-runtime.lock (no pytest/ruff): used by the 
 	@echo "# Regenerate with: make lock-runtime" >> requirements-runtime.lock
 	.venv-runtime/bin/python -m pip freeze | grep -viE '^opspilot(==|\s)' >> requirements-runtime.lock
 	rm -rf .venv-runtime
+
+# Needs kubectl (it includes Kustomize) and kubeconform; CI installs both.
+k8s-check: ## Render deploy/kubernetes and validate it against the Kubernetes 1.33 schemas
+	kubectl kustomize deploy/kubernetes | kubeconform -strict -summary -kubernetes-version 1.33.0 -
 
 clean: ## Remove caches and local eval results
 	rm -rf .pytest_cache .ruff_cache ui/.next ui/test-results ui/playwright-report

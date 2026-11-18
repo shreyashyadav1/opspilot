@@ -66,6 +66,25 @@ jobs:
       - name: Build images
         run: docker compose -f demo-system/docker-compose.yml build
 
+  kubernetes:
+    name: Kubernetes manifests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: stable
+          cache: false
+
+      - name: Install kubeconform
+        run: go install github.com/yannh/kubeconform/cmd/kubeconform@v0.7.0
+
+      - name: Render and validate
+        # kubectl on the runner image includes Kustomize.
+        run: PATH="$(go env GOPATH)/bin:$PATH" make k8s-check
+
   api:
     name: Agent API tests and image
     runs-on: ubuntu-latest

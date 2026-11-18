@@ -1,0 +1,45 @@
+// Ship the demo services' pod logs to Loki. Logs are read through the Kubernetes API
+// (pods/log), so Alloy needs no hostPath mounts and runs as a single Deployment.
+//
+// Each stream gets a `service` label from the pod's app.kubernetes.io/name label. The MCP
+// server queries {service="<name>"} (OPSPILOT_LOKI_SERVICE_LABEL defaults to "service"), so only
+// pods that carry opspilot.dev/logs=true (the three services the agent investigates) are kept.
+
+discovery.kubernetes "pods" {
+  role = "pod"
+
+  namespaces {
+    own_namespace = true
+  }
+}
+
+discovery.relabel "services" {
+  targets = discovery.kubernetes.pods.targets
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_label_opspilot_dev_logs"]
+    regex         = "true"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
+    target_label  = "service"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_name"]
+    target_label  = "pod"
+  }
+}
+
+loki.source.kubernetes "services" {
+  targets    = discovery.relabel.services.output
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
